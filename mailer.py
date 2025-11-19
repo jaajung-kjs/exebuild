@@ -5,7 +5,7 @@ Uses dynamic mail configuration from 분류표.xlsx sheet 2
 
 import requests
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 import uuid
 from config import BIZMAIL_URL, HTTP_TIMEOUT
 
@@ -115,6 +115,10 @@ def send_bizmail(session, mail_config, attachment_paths=None):
     })
 
     try:
+        # Get tomorrow's date for subject and body
+        tomorrow = datetime.now() + timedelta(days=1)
+        date_yymmdd = tomorrow.strftime('%y%m%d')  # 251120 format
+        date_yy_mm_dd = tomorrow.strftime("'%y-%m-%d")  # '25-11-20 format
         # Step 1: Session validation
         print(f"\n  세션 확인 중...")
         timestamp = int(datetime.now().timestamp() * 1000)
@@ -140,8 +144,12 @@ def send_bizmail(session, mail_config, attachment_paths=None):
         # Step 3: Receiver validation
         print(f"  수신자 검증 중...")
 
+        # Inject tomorrow's date into subject and body
+        subject = mail_config['subject'].replace('{DATE}', date_yymmdd)
+        body_text = mail_config['body'].replace('{DATE}', date_yy_mm_dd)
+
         # Convert body to HTML format if not already
-        body_html = mail_config['body']
+        body_html = body_text
         if not body_html.strip().startswith('<html>'):
             body_html = f"""<html><head><style type="text/css">
 p {{padding:0;margin:0;}}
@@ -150,18 +158,19 @@ p {{padding:0;margin:0;}}
 {body_html}
 </div></body></html>"""
 
-        receiver_data = {
-            'subject': mail_config['subject'],
-            'subjecthead': '-1',
-            'content': body_html,
-            'fromaddr': mail_config['from_email'],
-            'attach_size': str(attach_size),
-            'attach_list': attach_list,
-        }
+        # Build receiver_data with multiple 'to' parameters
+        receiver_data = [
+            ('subject', subject),
+            ('subjecthead', '-1'),
+            ('content', body_html),
+            ('fromaddr', mail_config['from_email']),
+            ('attach_size', str(attach_size)),
+            ('attach_list', attach_list),
+        ]
 
-        # Add recipients
+        # Add each recipient as separate 'to' parameter
         for recipient in mail_config['recipients']:
-            receiver_data['to'] = recipient
+            receiver_data.append(('to', recipient))
 
         receiver_resp = session.post(
             f"{BIZMAIL_URL}/mail/json/receiverCheck.do",
@@ -185,109 +194,109 @@ p {{padding:0;margin:0;}}
         secure_value = temp_key[:10]
         current_date = datetime.now().strftime("%Y-%m-%d")
 
-        # Complete parameters from HAR analysis
-        send_data = {
+        # Build send_data with multiple 'to' parameters (list of tuples)
+        send_data = [
             # Basic info
-            'fromaddr': mail_config['from_email'],
-            'fromname': mail_config['from_name'],
-            'subject': mail_config['subject'],
-            'subjecthead': '-1',
-            'body': body_html,
+            ('fromaddr', mail_config['from_email']),
+            ('fromname', mail_config['from_name']),
+            ('subject', subject),
+            ('subjecthead', '-1'),
+            ('body', body_html),
 
-            # Recipients
-            '_tome': 'on',
-            '_is_report': 'on',
+            # Recipients flags
+            ('_tome', 'on'),
+            ('_is_report', 'on'),
 
             # Temporary key & security
-            'tempKey': temp_key,
-            'secureValue': secure_value,
-            'ukey': '',
-            'first': '0',
-            'tempsave': '0',
+            ('tempKey', temp_key),
+            ('secureValue', secure_value),
+            ('ukey', ''),
+            ('first', '0'),
+            ('tempsave', '0'),
 
             # Attachments
-            'attachments': attachments_param,
+            ('attachments', attachments_param),
 
             # Reservation & approval
-            'reserverTime': '',
-            'req_reserverTime': '',
-            'mail_cancel_time': '0',
-            'approval_flag': '0',
-            'isPermissionMail': '',
-            'reserveEndTime': '',
-            'repeat_type': '',
-            'repeat_cycle': '0',
-            'repeat_dayofweek': '',
-            'repeat_mailkey': '',
-            'myTemplateKey': '',
+            ('reserverTime', ''),
+            ('req_reserverTime', ''),
+            ('mail_cancel_time', '0'),
+            ('approval_flag', '0'),
+            ('isPermissionMail', ''),
+            ('reserveEndTime', ''),
+            ('repeat_type', ''),
+            ('repeat_cycle', '0'),
+            ('repeat_dayofweek', ''),
+            ('repeat_mailkey', ''),
+            ('myTemplateKey', ''),
 
             # Link attachment
-            'islinkattach': '0',
-            'use_bigfile_password': '0',
-            'linkattach_filesize': '',
-            'linkattach_downterm': '',
-            'temp_save_bigfile': '1',
+            ('islinkattach', '0'),
+            ('use_bigfile_password', '0'),
+            ('linkattach_filesize', ''),
+            ('linkattach_downterm', ''),
+            ('temp_save_bigfile', '1'),
 
             # Approval
-            'approvalkey': '',
-            'ap_send_type': '0',
-            'approver': '',
-            'is_ap': '0',
+            ('approvalkey', ''),
+            ('ap_send_type', '0'),
+            ('approver', ''),
+            ('is_ap', '0'),
 
             # Options
-            '_is_each': 'on',
-            '_important': 'on',
-            '_use_sign': 'on',
-            'sign': 'mail_sign',
+            ('_is_each', 'on'),
+            ('_important', 'on'),
+            ('_use_sign', 'on'),
+            ('sign', 'mail_sign'),
 
             # Reservation time
-            'reserveTime': current_date,
-            'c_reserveTime': current_date,
-            'hour_c': '23',
-            'minute_c': '50',
+            ('reserveTime', current_date),
+            ('c_reserveTime', current_date),
+            ('hour_c', '23'),
+            ('minute_c', '50'),
 
             # Editor
-            'editor_type': '1',
-            'characterset': 'utf-8',
+            ('editor_type', '1'),
+            ('characterset', 'utf-8'),
 
             # Security & receipt
-            '_is_secure': 'on',
-            'is_receipt': '1',
-            '_is_receipt': 'on',
+            ('_is_secure', 'on'),
+            ('is_receipt', '1'),
+            ('_is_receipt', 'on'),
 
             # Save to sent mail (important!)
-            'is_save': '1',
-            '_is_save': 'on',
+            ('is_save', '1'),
+            ('_is_save', 'on'),
 
             # Notifications & SMS
-            '_alarm': 'on',
-            '_sms': 'on',
+            ('_alarm', 'on'),
+            ('_sms', 'on'),
 
             # Reply request
-            'replyRequestTime': current_date,
-            'hour_r': '23',
-            'minute_r': '50',
+            ('replyRequestTime', current_date),
+            ('hour_r', '23'),
+            ('minute_r', '50'),
 
             # Approval report
-            'apUser': '',
-            'apUserText': '',
-            '_apReport': 'on',
+            ('apUser', ''),
+            ('apUserText', ''),
+            ('_apReport', 'on'),
 
             # Edit
-            'editHtml': '',
-            'editText': '',
-            'divText': '',
-        }
+            ('editHtml', ''),
+            ('editText', ''),
+            ('divText', ''),
+        ]
 
-        # Add recipients
+        # Add each recipient as separate 'to' parameter (CRITICAL for multiple recipients!)
         for recipient in mail_config['recipients']:
-            send_data['to'] = recipient
+            send_data.append(('to', recipient))
 
         print(f"    발신: {mail_config['from_name']} <{mail_config['from_email']}>")
         print(f"    수신: {len(mail_config['recipients'])}명")
         for rcpt in mail_config['recipients']:
             print(f"      - {rcpt}")
-        print(f"    제목: {mail_config['subject']}")
+        print(f"    제목: {subject}")
         print(f"    첨부: {len(uploaded_files)}개")
 
         # Send!
