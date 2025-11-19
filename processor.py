@@ -132,7 +132,7 @@ def load_classification_and_mail_config(classification_file):
         # E2: 메일 제목
         subject = ws2.cell(row=2, column=5).value
 
-        # F2: 메일 본문
+        # F2: 메일 본문 (HTML)
         body = ws2.cell(row=2, column=6).value
 
         mail_config = {
@@ -339,79 +339,114 @@ def process_dataframe(df, keywords, special_rules):
     output_filename = tomorrow.strftime('%y%m%d') + ' 공사현장 점검 우선순위 리스트.xlsx'
     output_filepath = os.path.join(output_dir, output_filename)
 
-    # DataFrame을 Excel로 저장
+    # D열(4번째 열)의 고유값 추출
+    d_column_name = df.columns[3]  # 0-based index, D열은 4번째
+    unique_d_values = sorted(df[d_column_name].dropna().unique())
+
+    print(f"\n  D열({d_column_name}) 고유값: {len(unique_d_values)}개")
+    for idx, val in enumerate(unique_d_values, 1):
+        count = len(df[df[d_column_name] == val])
+        print(f"    {idx}. {val}: {count}건")
+
+    # DataFrame을 Excel로 저장 (다중 시트)
     with pd.ExcelWriter(output_filepath, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name='Sheet1')
+        # 메인 시트명: C2 셀 값 사용 (C열은 3번째 열, 인덱스 2)
+        main_sheet_name = str(df.iloc[0, 2]) if len(df) > 0 else '메인'
 
-        # 워크시트 가져오기
+        # 1. 메인 시트 생성 (전체 데이터)
+        print(f"\n  메인 시트 생성 중: {main_sheet_name}")
+        df.to_excel(writer, index=False, sheet_name=main_sheet_name)
+
+        # 2. D열 고유값별 시트 생성
+        print(f"\n  D열 고유값별 시트 생성 중...")
+        for d_value in unique_d_values:
+            # 필터링된 데이터
+            filtered_df = df[df[d_column_name] == d_value].copy()
+
+            # 시트명 (Excel 시트명 제한: 31자, 특수문자 제거)
+            sheet_name = str(d_value)[:31]
+            sheet_name = sheet_name.replace('/', '_').replace('\\', '_').replace('*', '_')
+            sheet_name = sheet_name.replace('[', '_').replace(']', '_').replace(':', '_')
+            sheet_name = sheet_name.replace('?', '_')
+
+            # 시트 생성
+            filtered_df.to_excel(writer, index=False, sheet_name=sheet_name)
+            print(f"    시트 '{sheet_name}': {len(filtered_df)}건")
+
+        # 워크북 가져오기
         wb = writer.book
-        ws = writer.sheets['Sheet1']
 
-        # 열 너비 적용
-        column_widths = {
-            'A': 6.66, 'B': 9.83, 'C': 8.83, 'D': 13.83, 'E': 12.16,
-            'F': 21.33, 'G': 14.5, 'H': 13.0, 'I': 13.0, 'J': 17.5,
-            'K': 8.5, 'L': 13.0, 'M': 13.0, 'N': 21.83, 'O': 28.33,
-            'P': 17.16, 'Q': 10.0, 'R': 10.16, 'S': 10.0, 'T': 11.5
-        }
+        # 모든 시트에 동일한 서식 적용
+        print(f"\n  모든 시트에 서식 적용 중...")
+        for sheet_name in wb.sheetnames:
+            ws = wb[sheet_name]
 
-        for col_letter, width in column_widths.items():
-            if col_letter_to_index(col_letter) <= len(df.columns):
-                ws.column_dimensions[col_letter].width = width
+            # 열 너비 적용
+            column_widths = {
+                'A': 6.66, 'B': 9.83, 'C': 8.83, 'D': 13.83, 'E': 12.16,
+                'F': 21.33, 'G': 14.5, 'H': 13.0, 'I': 13.0, 'J': 17.5,
+                'K': 8.5, 'L': 13.0, 'M': 13.0, 'N': 21.83, 'O': 28.33,
+                'P': 17.16, 'Q': 10.0, 'R': 10.16, 'S': 10.0, 'T': 11.5
+            }
 
-        # 전체 셀 가운데 정렬 + 텍스트 자동 줄바꿈
-        center_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+            for col_letter, width in column_widths.items():
+                if col_letter_to_index(col_letter) <= len(df.columns):
+                    ws.column_dimensions[col_letter].width = width
 
-        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-            for cell in row:
-                cell.alignment = center_alignment
+            # 전체 셀 가운데 정렬 + 텍스트 자동 줄바꿈
+            center_alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
 
-        # 제목행 스타일 (1행)
-        bold_font = Font(bold=True)
-        gray_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
+            for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+                for cell in row:
+                    cell.alignment = center_alignment
 
-        for col in range(1, ws.max_column + 1):
-            cell = ws.cell(row=1, column=col)
-            cell.font = bold_font
-            cell.fill = gray_fill
+            # 제목행 스타일 (1행)
+            bold_font = Font(bold=True)
+            gray_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
 
-        # 우선순위별 행 배경색 적용 (2행부터)
-        priority_colors = {
-            '1순위': 'FFFF00',  # 노란색
-            '2순위': 'F7B9AF'   # 분홍색
-        }
+            for col in range(1, ws.max_column + 1):
+                cell = ws.cell(row=1, column=col)
+                cell.font = bold_font
+                cell.fill = gray_fill
 
-        priority_col_idx = len(df.columns)  # 마지막 열 (점검순위)
+            # 우선순위별 행 배경색 적용 (2행부터)
+            priority_colors = {
+                '1순위': 'FFFF00',  # 노란색
+                '2순위': 'F7B9AF'   # 분홍색
+            }
 
-        for row_idx in range(2, ws.max_row + 1):
-            priority = ws.cell(row=row_idx, column=priority_col_idx).value
+            priority_col_idx = len(df.columns)  # 마지막 열 (점검순위)
 
-            if priority in priority_colors:
-                color = priority_colors[priority]
-                fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
+            for row_idx in range(2, ws.max_row + 1):
+                priority = ws.cell(row=row_idx, column=priority_col_idx).value
 
-                for col in range(1, ws.max_column + 1):
-                    ws.cell(row=row_idx, column=col).fill = fill
+                if priority in priority_colors:
+                    color = priority_colors[priority]
+                    fill = PatternFill(start_color=color, end_color=color, fill_type="solid")
 
-        # 모든 셀에 테두리 적용
-        thin_border = Border(
-            left=Side(style='thin', color='000000'),
-            right=Side(style='thin', color='000000'),
-            top=Side(style='thin', color='000000'),
-            bottom=Side(style='thin', color='000000')
-        )
+                    for col in range(1, ws.max_column + 1):
+                        ws.cell(row=row_idx, column=col).fill = fill
 
-        for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
-            for cell in row:
-                cell.border = thin_border
+            # 모든 셀에 테두리 적용
+            thin_border = Border(
+                left=Side(style='thin', color='000000'),
+                right=Side(style='thin', color='000000'),
+                top=Side(style='thin', color='000000'),
+                bottom=Side(style='thin', color='000000')
+            )
 
-        # 틀 고정 (1행 고정)
-        ws.freeze_panes = 'A2'
+            for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=ws.max_column):
+                for cell in row:
+                    cell.border = thin_border
 
-        # 자동 필터 적용
-        ws.auto_filter.ref = ws.dimensions
+            # 틀 고정 (1행 고정)
+            ws.freeze_panes = 'A2'
 
-    print(f"  저장 완료: {output_filename}")
+            # 자동 필터 적용
+            ws.auto_filter.ref = ws.dimensions
+
+    print(f"\n  저장 완료: {output_filename}")
+    print(f"  총 시트 수: {len(unique_d_values) + 1}개 (메인 1개 + D열 고유값 {len(unique_d_values)}개)")
     print("=" * 60 + "\n")
 
     return output_filepath

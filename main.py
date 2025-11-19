@@ -23,6 +23,41 @@ import mailer
 from config import get_classification_file_path, get_output_dir
 
 
+def read_department_code():
+    """
+    Read DEPARTMENT_CODE from 분류표.xlsx sheet 1, cell M2
+
+    Returns:
+        str: Department code (default: "4200" if read fails)
+    """
+    try:
+        from openpyxl import load_workbook
+
+        classification_file = get_classification_file_path()
+
+        if not os.path.exists(classification_file):
+            print(f"⚠️  분류표.xlsx 파일을 찾을 수 없습니다. 기본값 사용: 4200")
+            return "4200"
+
+        wb = load_workbook(classification_file, read_only=True, data_only=True)
+        ws = wb.worksheets[0]  # Sheet 1
+        dept_code = ws['M2'].value
+        wb.close()
+
+        if dept_code is None or str(dept_code).strip() == '':
+            print(f"⚠️  M2 셀이 비어있습니다. 기본값 사용: 4200")
+            return "4200"
+
+        dept_code_str = str(dept_code).strip()
+        print(f"✅ 부서코드 로드: {dept_code_str} (분류표.xlsx M2)")
+        return dept_code_str
+
+    except Exception as e:
+        print(f"⚠️  부서코드 읽기 실패: {e}")
+        print(f"   기본값 사용: 4200")
+        return "4200"
+
+
 def print_header():
     """Print program header"""
     print("\n" + "=" * 60)
@@ -72,7 +107,10 @@ def main():
         print("\n⚡ [2/4] Excel 다운로드")
         print("-" * 60)
 
-        df = downloader.download_excel_to_dataframe(session)
+        # Read department code from 분류표.xlsx M2
+        dept_code = read_department_code()
+
+        df = downloader.download_excel_to_dataframe(session, department_code=dept_code)
 
         if df is None:
             print("\n❌ 다운로드 실패")

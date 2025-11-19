@@ -13,7 +13,7 @@ from config import (
 )
 
 
-def download_excel_to_dataframe(session, date_from=None, date_to=None):
+def download_excel_to_dataframe(session, date_from=None, date_to=None, department_code=None):
     """
     Download Excel from Work Monitor and return as DataFrame
 
@@ -21,6 +21,7 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None):
         session (requests.Session): Authenticated session
         date_from (str): Start date (YYYY-MM-DD), default: tomorrow
         date_to (str): End date (YYYY-MM-DD), default: tomorrow
+        department_code (str): Department code, default: from config.DEPARTMENT_CODE
 
     Returns:
         pandas.DataFrame: Downloaded data
@@ -29,6 +30,10 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None):
     print("=" * 60)
     print("엑셀 다운로드")
     print("=" * 60)
+
+    # Use provided department_code or fallback to config
+    if department_code is None:
+        department_code = DEPARTMENT_CODE
 
     # Set date range
     if not date_from:
@@ -43,7 +48,7 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None):
     print(f"  페이지: {PAGE}")
     print(f"  항목 수: {LIST_COUNT}개")
     print(f"  날짜 범위: {date_range}")
-    print(f"  담당부서: {DEPARTMENT_CODE} (강원본부)")
+    print(f"  담당부서: {department_code} (강원본부)")
 
     # Update session headers
     session.headers.update({
@@ -64,7 +69,7 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None):
             'gubun1': '',
             'gubun2': 'null',
             'dateRange': date_range,
-            'selectOne': DEPARTMENT_CODE,
+            'selectOne': department_code,
             'selectTwo': '',
             'selectDept': '',
             'keyword_gubun': '',
