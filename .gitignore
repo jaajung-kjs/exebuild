@@ -27,6 +27,9 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# PowerGate (local tool, not part of project)
+PowerGate/
+
 # Project specific
 *.xls
 *.xlsx

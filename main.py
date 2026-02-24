@@ -14,6 +14,7 @@ Automated workflow: Download → Process → Send Email
 from datetime import datetime, timedelta
 import sys
 import os
+import time
 
 # Import modules
 import auth
@@ -141,43 +142,50 @@ def main():
         print(f"\n📅 대상 날짜: {target_date_str} (YYMMDD: {target_date_yymmdd})")
 
         # ============================================
-        # Step 1: Authentication (with retry + validation)
+        # Step 1: Authentication + Download (with retry)
         # ============================================
-        print(f"\n⚡ [1/4] PowerGate 인증")
+        MAX_RETRIES = 10
+        RETRY_DELAY = 3
+        print(f"\n⚡ [1/3] 인증 + 다운로드 (최대 {MAX_RETRIES}회 시도)")
         print("-" * 60)
 
-        session = auth.authenticate()
+        session = None
+        df = None
 
-        if session is None:
-            print("\n❌ 인증 실패")
+        for attempt in range(1, MAX_RETRIES + 1):
+            if attempt > 1:
+                print(f"\n🔄 재시도 {attempt}/{MAX_RETRIES} ({RETRY_DELAY}초 대기 후)...")
+                time.sleep(RETRY_DELAY)
+
+            # 1. Authentication (auth 내부에서 GET 검증 + 재시도)
+            session = auth.authenticate()
+            if session is None:
+                print(f"  ⚠️  인증 실패")
+                continue
+
+            # 2. Download
+            df = downloader.download_excel_to_dataframe(
+                session, date_from=target_date_str, department_code=dept_code
+            )
+            if df is not None:
+                break
+
+            print(f"  ⚠️  다운로드 실패 — 재인증 후 재시도합니다")
+        else:
+            print(f"\n❌ {MAX_RETRIES}회 시도 후에도 인증+다운로드에 실패했습니다")
             print("\n해결 방법:")
             print("  1. PowerGate가 실행 중인지 확인하세요")
-            print("  2. 작업 관리자에서 PowerGate 프로세스를 확인하세요")
-            print("  3. PowerGate를 재시작하고 다시 시도하세요")
+            print("  2. 사내망에 연결되어 있는지 확인하세요")
+            print("  3. Work Monitor 서버 접근 권한을 확인하세요")
+            print("  4. 해당 날짜에 데이터가 있는지 확인하세요")
             return
 
-        # ============================================
-        # Step 2: Download Excel
-        # ============================================
-        print("\n⚡ [2/4] Excel 다운로드")
-        print("-" * 60)
-
-        df = downloader.download_excel_to_dataframe(
-            session, date_from=target_date_str, department_code=dept_code
-        )
-
-        if df is None:
-            print("\n❌ 다운로드 실패")
-            print("\n해결 방법:")
-            print("  1. 사내망에 연결되어 있는지 확인하세요")
-            print("  2. Work Monitor 서버 접근 권한을 확인하세요")
-            print("  3. 해당 날짜에 데이터가 있는지 확인하세요")
-            return
+        print(f"\n  ✅ 인증 + 다운로드 성공")
 
         # ============================================
-        # Step 3: Load classification and process data
+        # Step 2: Load classification and process data
         # ============================================
-        print(f"\n⚡ [3/4] 데이터 가공")
+        print(f"\n⚡ [2/3] 데이터 가공")
         print("-" * 60)
 
         classification_file = get_classification_file_path()
@@ -216,7 +224,7 @@ def main():
         # ============================================
         # Step 4: Send email
         # ============================================
-        print(f"\n⚡ [4/4] 메일 전송")
+        print(f"\n⚡ [3/3] 메일 전송")
         print("-" * 60)
 
         result = mailer.send_bizmail(

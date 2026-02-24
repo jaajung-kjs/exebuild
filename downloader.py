@@ -12,6 +12,8 @@ from config import (
     PAGE, LIST_COUNT, DEPARTMENT_CODE
 )
 
+MIN_VALID_COLUMNS = 2
+
 
 def download_excel_to_dataframe(session, date_from=None, date_to=None, department_code=None):
     """
@@ -115,11 +117,6 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None, departmen
 
                 if dfs and len(dfs) > 0:
                     df = dfs[0]
-                    print(f"[성공] DataFrame 생성 완료!")
-                    print(f"        행 수: {len(df)}")
-                    print(f"        열 수: {len(df.columns)}")
-                    print("=" * 60 + "\n")
-                    return df
                 else:
                     print(f"[실패] HTML 테이블을 찾을 수 없습니다")
                     return None
@@ -127,11 +124,19 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None, departmen
                 # Read as Excel file
                 print(f"[변환] Excel → DataFrame 변환 중...")
                 df = pd.read_excel(content, engine='xlrd')
-                print(f"[성공] DataFrame 생성 완료!")
-                print(f"        행 수: {len(df)}")
-                print(f"        열 수: {len(df.columns)}")
-                print("=" * 60 + "\n")
-                return df
+
+            # Validate: server error returns 1-column DataFrame with error message
+            if len(df.columns) < MIN_VALID_COLUMNS:
+                first_value = str(df.iloc[0, 0]) if len(df) > 0 else ''
+                print(f"[실패] 서버 오류 응답 (열 {len(df.columns)}개)")
+                print(f"        내용: {first_value[:100]}")
+                return None
+
+            print(f"[성공] DataFrame 생성 완료!")
+            print(f"        행 수: {len(df)}")
+            print(f"        열 수: {len(df.columns)}")
+            print("=" * 60 + "\n")
+            return df
 
         else:
             print(f"\n[실패] HTTP 오류")
