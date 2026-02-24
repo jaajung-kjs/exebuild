@@ -83,7 +83,7 @@ def upload_files(session, file_paths):
     return uploaded_files
 
 
-def send_bizmail(session, mail_config, attachment_paths=None):
+def send_bizmail(session, mail_config, attachment_paths=None, date_yymmdd=None, date_yy_mm_dd=None):
     """
     Send email via KEPCO BizMail system
 
@@ -98,6 +98,8 @@ def send_bizmail(session, mail_config, attachment_paths=None):
                 'body': str
             }
         attachment_paths (list): Optional list of file paths to attach
+        date_yymmdd (str): Date in YYMMDD format for subject (default: tomorrow)
+        date_yy_mm_dd (str): Date in 'YY-MM-DD format for body (default: tomorrow)
 
     Returns:
         dict: {'success': bool, 'message': str, 'response': dict}
@@ -115,10 +117,13 @@ def send_bizmail(session, mail_config, attachment_paths=None):
     })
 
     try:
-        # Get tomorrow's date for subject and body
-        tomorrow = datetime.now() + timedelta(days=1)
-        date_yymmdd = tomorrow.strftime('%y%m%d')  # 251120 format
-        date_yy_mm_dd = tomorrow.strftime("'%y-%m-%d")  # '25-11-20 format
+        # Use provided dates or fallback to tomorrow
+        if date_yymmdd is None:
+            tomorrow = datetime.now() + timedelta(days=1)
+            date_yymmdd = tomorrow.strftime('%y%m%d')  # 251120 format
+        if date_yy_mm_dd is None:
+            tomorrow = datetime.now() + timedelta(days=1)
+            date_yy_mm_dd = tomorrow.strftime("'%y-%m-%d")  # '25-11-20 format
         # Step 1: Session validation
         print(f"\n  세션 확인 중...")
         timestamp = int(datetime.now().timestamp() * 1000)

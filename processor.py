@@ -259,7 +259,7 @@ def col_letter_to_index(letter):
     return result
 
 
-def process_dataframe(df, keywords, special_rules):
+def process_dataframe(df, keywords, special_rules, target_date_yymmdd=None):
     """
     Process DataFrame and save as Excel with priority classification
 
@@ -267,6 +267,7 @@ def process_dataframe(df, keywords, special_rules):
         df: pandas DataFrame from download
         keywords: classification keywords
         special_rules: special priority rules
+        target_date_yymmdd: target date in YYMMDD format (default: tomorrow)
 
     Returns:
         str: Output file path
@@ -335,8 +336,10 @@ def process_dataframe(df, keywords, special_rules):
     print(f"\n  Excel 서식 적용 및 저장 중...")
 
     output_dir = get_output_dir()
-    tomorrow = datetime.now() + timedelta(days=1)
-    output_filename = tomorrow.strftime('%y%m%d') + ' 공사현장 점검 우선순위 리스트.xlsx'
+    if target_date_yymmdd is None:
+        tomorrow = datetime.now() + timedelta(days=1)
+        target_date_yymmdd = tomorrow.strftime('%y%m%d')
+    output_filename = target_date_yymmdd + ' 공사현장 점검 우선순위 리스트.xlsx'
     output_filepath = os.path.join(output_dir, output_filename)
 
     # D열(4번째 열)의 고유값 추출

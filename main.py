@@ -11,7 +11,7 @@ Automated workflow: Download → Process → Send Email
     - 인터넷 연결 (사내망)
 """
 
-from datetime import datetime
+from datetime import datetime, timedelta
 import sys
 import os
 
@@ -58,6 +58,50 @@ def read_department_code():
         return "4200"
 
 
+def read_target_date():
+    """
+    Read target date from 분류표.xlsx sheet 1, cell N2
+
+    Returns:
+        datetime.date: Target date (default: tomorrow if cell is empty or read fails)
+    """
+    tomorrow = (datetime.now() + timedelta(days=1)).date()
+
+    try:
+        from openpyxl import load_workbook
+
+        classification_file = get_classification_file_path()
+
+        if not os.path.exists(classification_file):
+            print(f"⚠️  분류표.xlsx 파일을 찾을 수 없습니다. 기본값 사용: 내일({tomorrow})")
+            return tomorrow
+
+        wb = load_workbook(classification_file, read_only=True, data_only=True)
+        ws = wb.worksheets[0]  # Sheet 1
+        cell_value = ws['N2'].value
+        wb.close()
+
+        if cell_value is None or str(cell_value).strip() == '':
+            print(f"✅ 대상 날짜: {tomorrow} (N2 셀 비어있음 → 내일)")
+            return tomorrow
+
+        # openpyxl이 datetime 객체를 반환하는 경우
+        if hasattr(cell_value, 'date'):
+            target = cell_value.date()
+            print(f"✅ 대상 날짜 로드: {target} (분류표.xlsx N2)")
+            return target
+
+        # 문자열인 경우 YYYY-MM-DD 파싱
+        target = datetime.strptime(str(cell_value).strip(), '%Y-%m-%d').date()
+        print(f"✅ 대상 날짜 로드: {target} (분류표.xlsx N2)")
+        return target
+
+    except Exception as e:
+        print(f"⚠️  대상 날짜 읽기 실패: {e}")
+        print(f"   기본값 사용: 내일({tomorrow})")
+        return tomorrow
+
+
 def print_header():
     """Print program header"""
     print("\n" + "=" * 60)
@@ -85,10 +129,21 @@ def main():
     try:
         print_header()
 
+        # Read target date and department code
+        target_date = read_target_date()
+        dept_code = read_department_code()
+
+        # Prepare date formats for pipeline
+        target_date_str = target_date.strftime('%Y-%m-%d')         # downloader용
+        target_date_yymmdd = target_date.strftime('%y%m%d')        # processor, mailer subject
+        target_date_yy_mm_dd = target_date.strftime("'%y-%m-%d")   # mailer body
+
+        print(f"\n📅 대상 날짜: {target_date_str} (YYMMDD: {target_date_yymmdd})")
+
         # ============================================
-        # Step 1: Authentication
+        # Step 1: Authentication (with retry + validation)
         # ============================================
-        print("⚡ [1/4] PowerGate 인증")
+        print(f"\n⚡ [1/4] PowerGate 인증")
         print("-" * 60)
 
         session = auth.authenticate()
@@ -107,10 +162,9 @@ def main():
         print("\n⚡ [2/4] Excel 다운로드")
         print("-" * 60)
 
-        # Read department code from 분류표.xlsx M2
-        dept_code = read_department_code()
-
-        df = downloader.download_excel_to_dataframe(session, department_code=dept_code)
+        df = downloader.download_excel_to_dataframe(
+            session, date_from=target_date_str, department_code=dept_code
+        )
 
         if df is None:
             print("\n❌ 다운로드 실패")
@@ -121,9 +175,9 @@ def main():
             return
 
         # ============================================
-        # Step 3: Load classification and mail config
+        # Step 3: Load classification and process data
         # ============================================
-        print("\n⚡ [3/4] 데이터 가공")
+        print(f"\n⚡ [3/4] 데이터 가공")
         print("-" * 60)
 
         classification_file = get_classification_file_path()
@@ -148,7 +202,10 @@ def main():
             return
 
         # Process DataFrame and save to Excel
-        output_file = processor.process_dataframe(df, keywords, special_rules)
+        output_file = processor.process_dataframe(
+            df, keywords, special_rules,
+            target_date_yymmdd=target_date_yymmdd
+        )
 
         if output_file is None or not os.path.exists(output_file):
             print("\n❌ 데이터 가공 실패")
@@ -159,13 +216,15 @@ def main():
         # ============================================
         # Step 4: Send email
         # ============================================
-        print("\n⚡ [4/4] 메일 전송")
+        print(f"\n⚡ [4/4] 메일 전송")
         print("-" * 60)
 
         result = mailer.send_bizmail(
             session=session,
             mail_config=mail_config,
-            attachment_paths=[output_file]
+            attachment_paths=[output_file],
+            date_yymmdd=target_date_yymmdd,
+            date_yy_mm_dd=target_date_yy_mm_dd
         )
 
         if result['success']:
