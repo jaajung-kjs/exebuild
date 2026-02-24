@@ -1,0 +1,35 @@
+
+{
+    "name": "PowToolBand",
+    "description": "PowToolBand",
+    "version": "1.0.0.8",
+    "manifest_version": 2,
+    "background": {
+        "page" : "background.html"
+    },
+    "browser_action": {
+        "default_icon" : {
+            "16" : "img/PowerNet_red.ICO"
+        },
+        "default_popup": "foreground.html"
+    },
+    "options_ui" : {
+        "page" : "options.html",
+        "open_in_tab" : true
+    },
+    "icons": {
+        "16": "img/PowerNet_blue.ICO"
+    },
+    "permissions": [
+        "tabs",
+        "<all_urls>",
+        "cookies",
+        "activeTab",
+        "storage",
+        "webRequest"
+    ],
+    "chrome_url_overrides": {
+        "newtab": "newtab.html"
+    },
+    "update_url": "http://sso.kepco.co.kr:8090/extension/powtoolband.xml"
+}

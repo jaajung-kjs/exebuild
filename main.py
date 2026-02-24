@@ -195,6 +195,9 @@ def main():
     finally:
         print_footer(success)
 
+        # 창 닫기 방지 (Enter 키 대기)
+        input("\n프로그램을 종료하려면 Enter 키를 누르세요...")
+
 
 if __name__ == '__main__':
     """

@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="ko">
+<meta charset=utf-8>
+  <script type="text/javascript" src="/lib/jquery-3.3.1.min.js"></script>
+  <script type="text/javascript" src="/lib/jquery-ui-1.12.1.custom.min.js"></script>
+  <script type="text/javascript" src="/lib/jquery.js"></script>
+  <script type="text/javascript" src="/lib/jquery.window.js"></script>
+
+  <script type="text/javascript" src="./options.js"></script>
+  <link rel="stylesheet" type="text/css" href="./options.css">
+<body>
+    <div class="wrapBody">
+        <!-- 메뉴 부분 cont-left-->
+        <div class="gnb">
+            <div class="title">
+                <img src="img/logoKEPCO-EP.ico">
+                <h1>환경설정</h1>
+            </div>
+            <div class="menu">
+                <div id="alarmMng" class="list alarmMng currentTap">
+                    <a href="#"><img src="img/icoMenu01.ico">알람매니저 설정</a>
+                </div>
+                <div id="screenSaver" class="list screenSaver">
+                    <a href="#"><img src="img/icoMenu02.ico">화면보호기 설정</a>
+                </div>
+                <div id="ssoAuth" class="list ssoAuth">
+                    <a href="#"><img src="img/icoMenu03.ico">SSO 로그인 설정</a>
+                </div>
+                <div id="serverSet" class="list serverSet">
+                    <a href="#"><img src="img/icoMenu04.ico">서버 설정</a>
+                </div>
+                <div id="placeSet" class="list placeSet">
+                    <a href="#"><img src="img/icoMenu05.ico">재석표시 설정</a>
+                </div>
+                <div id="transSet" class="list transSet">
+                    <a href="#"><img src="img/icoMenu06.ico">발신표시 설정</a>
+                </div>
+                <div id="userSet" class="list userSet invisible">
+                    <a href="#"><img src="img/icoMenu07.ico">도구모음 사용자 설정</a>
+                </div>
+                <div id="authInfo" class="list authInfo invisible">
+                    <a href="#"><img src="img/icoMenu08.ico">인증서 정보</a>
+                </div>
+                <button id="btnDefault" class="btnDefault_W">기본값 복원</button>
+            </div>
+        </div>
+
+        <div id="content">
+            <!--////////// 알람매니저 설정 //////////-->
+            <div class="cont alarmMng">
+                <img src="img/icoAlarm.ico"><h2>알람 매니저 설정의 환경을 설정합니다.</h2>
+                <div class="board">
+                    <div class="list01">
+                        <h3>알람 메시지 윈도우 설정</h3>
+                        <input type="radio" name="001" value="1"></input><label>메시지 겹쳐 보이기</label>
+                        <input type="radio" name="001" value="2"></input><label>메시지 쌓여서 보이기</label>
+                        <div class="borderLine"></div>
+                    </div>
+                    <div class="list01">
+                        <h3>알람 메시지 윈도우 위치 설정</h3>
+                        <input type="radio" name="002" value="1"></input><label>왼쪽 위</label>
+                        <input type="radio" name="002" value="2" style="clear:none; float:left; margin-left:94px;"></input><label>왼쪽 아래</label>
+                        <input type="radio" name="002" value="3"></input><label>오른쪽 위</label>
+                        <input type="radio" name="002" value="4" style="clear:none; float:left; margin-left:80px;"></input><label>오른쪽 아래</label>
+                        <div class="borderLine"></div>
+                    </div>
+                    <div class="list01">
+                        <h3>알람 창 닫기 설정</h3>
+                        <input type="radio" name="003" value="1"></input><label>모두 닫기</label>
+                        <input type="radio" name="003" value="2"></input><label>선택 닫기</label>
+                        <div class="borderLine"></div>
+                    </div>
+                    <div class="list01">
+                        <h3>알람 소리 설정</h3>
+                        <input type="radio" name="004" value="1"></input><label>없음</label>
+                        <input type="radio" name="004" value="2" style="clear:none; float:left; margin-left:30px;" ></input><label>한번만</label>
+                        <input type="radio" name="004" value="3" style="clear:none; float:left; margin-left:30px;" ></input><label>1분마다</label>
+                        <input type="radio" name="004" value="4" style="clear:none; float:left; margin-left:30px;" ></input><label>5분마다</label>
+                        <div class="borderLine"></div>
+                    </div>
+                    <!--
+                    <div class="list01">
+                        <h3>메시지 수신 알람 소리 설정</h3>
+                        <input type="text" name="005" id="005" class="inputLocation" readonly><button id="mod005" class="mdbtn">수정</button>
+                        <div class="borderLine"></div>
+                    </div>
+                    -->
+                    <div class="list01">
+                        <h3>버전업 서버 설정</h3>
+                        <p class="p_defalut">서버주소</p><input type="text" name="006" id="006" readonly style="margin-bottom:10px;" class="inputLocation" ><button id="mod006" class="mdbtn">수정</button>
+                        <p class="p_defalut" style="clear:both;">디렉토리</p><input type="text" name="007" id="007" readonly class="inputLocation" ><button id="mod007" class="mdbtn">수정</button>
+                    </div>
+                </div>
+            </div>
+            <!--////////// 알람매니저 설정 끝 //////////-->
+
+            <!--////////// 화면보호기 설정 //////////-->
+            <div class="cont screenSaver invisible">
+                <div class="board" style="margin-top:40px;">
+                    <div class="list01">
+                        <h3>비밀번호 설정</h3>
+                            <input type="radio" name="021" value="1"></input><label>KEPCO-EP 비밀번호 사용</label>
+                            <input type="radio" name="021" value="3"></input><label>윈도우 비밀번호 사용</label>
+                            <input type="radio" name="021" value="2" id="021"></input><label>새로운 비밀번호 사용(화면보호기 전용)</label>
+                            <input type="password" name="021_2" id="021_2" readonly class="inputPW" style="clear:both; margin-top:10px; width:358px;"><button id="mod021" class="mdbtn" style="margin-top:10px;">수정</button>
+                            <input type="radio" name="021" value="4"></input><label>생체인증 사용</label>
+                        <div class="borderLine" style="margin-top:200px;"></div>
+                    </div>
+
+                    <div class="list01">
+                        <h3>서버 화면보호기 설정</h3>
+                        <p style="float: left; width: 380px;">화면보호기 동작 시 암호 동작 시간을 설정 할 수 있습니다.</p>
+                        <div class="saverBtn">
+                            <button id="mod023" class="mdbtn">설정하기</button>
+                        </div>
+                        <div class="saverSet invisible">
+                            <input type="radio" name="023" value="1"></input><label>화면보호기 자동설정/암호동작 사용안함</label>
+                            <input type="radio" name="023" value="2"></input><label>화면보호기 수동설정/암호동작 사용</label>
+                            <input type="radio" name="023" value="3"></input><label>화면보호기 수동설정/암호동작 사용안함</label>
+                            <input type="radio" name="023" value="4"></input><label>화면보호기 초기화</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!--////////// 화면보호기 설정 끝 //////////-->
+
+            <!--////////// SSO 로그인 설정 //////////-->
+            <div class="cont ssoAuth invisible">
+                <div class="board" style="margin-top:40px;">
+                    <div class="list01">
+                        <h3 style="margin-bottom:25px;">SSO 로그인 설정</h3>
+                        <div class="listExplanation">
+                            <input type="radio" name="041" value="1" style="margin:-8px 0px 0px 20px;"></input><label>비밀번호 우선사용 (인증서 사용)</label>
+                            <div class="whiteBar01"></div>
+                            <p>PC에 설치된 KEPCO 사설인증서를 사용하여 사용자 인증</p>
+                        </div>
+                        <div class="listExplanation">
+                            <input type="radio" name="041" value="2" style="margin:-8px 0px 0px 20px;"></input><label>생체인증 우선사용</label>
+                            <div class="whiteBar02"></div>
+                            <p style="float:left; width:90px;">로그인 사번</p><input type="text" id="041_2" name="041_2" readonly style="margin-top:30px; float:left;" class="inputLocation"><button id="mod041" class="mdbtn" style="margin-top:30px">수정</button>
+                        </div>
+                        <div class="borderLine" style="margin-top:40px;"></div>
+                    </div>
+                    <div class="list01">
+                        <h3>생체인증 서버 설정</h3>
+                        <div class="listExplanation">
+                            <p style="float:left; margin-top:45px; width:90px;">서버주소</p><input type="text" id="042" name="042" readonly style="margin-top:45px;" class="inputLocation"><button id="mod042" class="mdbtn" style="margin-top:45px">수정</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!--////////// SSO 로그인 설정 끝 //////////-->
+
+            <!--////////// 서버 설정 //////////-->
+            <div class="cont serverSet invisible">
+                <img src="img/icoSetserver.ico"><h2>각 서비스에 필요한 서버 주소를 입력하십시오.</h2>
+                <div class="board">
+                    <div class="list01">
+                        <h3>검색 서비스</h3>
+                        <p class="p_defalut">검색 서버</p><input type="text" id="031" name="031" class="inputLocation"><button id="mod031" class="mdbtn">수정</button>
+                        <div class="borderLine"></div>
+                    </div>
+                    <div class="list01">
+                        <h3>웹메일 서버</h3>
+                        <p class="p_defalut">웹메일 주소</p><input type="text" id="032" name="032" class="inputLocation" style="margin-bottom:10px;" ><button id="mod032" class="mdbtn">수정</button>
+                        <p class="p_defalut" style="clear:both;">편지보내기 주소</p><input type="text" id="033" name="033" class="inputLocation"><button id="mod033" class="mdbtn">수정</button>
+                        <div class="borderLine"></div>
+                    </div>
+                    <div class="list01">
+                        <h3>전자 문서 서비스</h3>
+                        <p class="p_defalut">전자 문서 서버</p>
+                        <select type="text" id="034" name="034" class="inputPW" style="margin-top:3px; width:522px;">
+                            <option value="List0">본사</option>
+                            <option value="List1">서울본부</option>
+                            <option value="List2">남서울본부</option>
+                            <option value="List3">인천본부</option>
+                            <option value="List4">경기북부본부</option>
+                            <option value="List5">경기본부</option>
+                            <option value="List6">강원본부</option>
+                            <option value="List7">충북본부</option>
+                            <option value="List8">대전세종충남본부</option>
+                            <option value="List9">전북본부</option>
+                            <option value="List10">광주전남본부</option>
+                            <option value="List11">대구본부</option>
+                            <option value="List12">경북본부</option>
+                            <option value="List13">부산울산본부</option>
+                            <option value="List14">경남본부</option>
+                            <option value="List15">제주본부</option>
+                            <option value="List16">전력연구원</option>
+                        </select><button id="mod034" class="mdbtn">설정하기</button>
+                        <div class="borderLine"></div>
+                    </div>
+                    <div class="list01">
+                        <h3>인증서 발급 서비스</h3>
+                        <p class="p_defalut">인증서발급URL</p><input type="text" id="035" name="035" class="inputLocation"><button id="mod035" class="mdbtn">수정</button>
+                    </div>
+                </div>
+            </div>
+            <!--////////// 서버 설정 끝 //////////-->
+
+            <!--////////// 재석표시 설정 //////////-->
+            <div class="cont placeSet invisible">
+                <img src="img/icoSeat.ico"><h2>재석표시판의 환경을 설정합니다.</h2>
+        	    <div class="board">
+                    <div class="list01">
+                        <div class="listExplanation">
+                        <h3 class="listmargin" style="width: 130px;">사용/미사용 선택</h3>
+                            <div class="whiteBar02"></div>
+                            <input type="radio" name="061" value="1" style="margin:30px 0px 0px 25px; float:left;"></input><label style="margin-top: 30px;">사용</label>
+                            <input type="radio" name="061" value="0" style="clear:none; float:left; margin:30px 0 0 30px;"></input><label style="margin-top: 30px;">미사용</label>
+                        </div>
+                        <div class="borderLine" style="margin-top: 40px;"></div>
+                    </div>
+                    <div class="list01">
+                        <div class="listExplanation">
+                        <h3 class="listmargin" style="width: 160px;">재석 이미지 컬러 선택</h3>
+                            <div class="whiteBar01"></div>
+                            <input type="radio" name="062" value="1" style="margin:30px 0px 0px 25px; float:left;"></input><label style="margin-top: 30px;">녹색</label>
+                            <input type="radio" name="062" value="0" style="clear:none; float:left; margin:30px 0 0 30px;"></input><label style="margin-top: 30px;">빨강색</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!--////////// 재석표시 설정 끝 //////////-->
+
+            <!--////////// 발신표시 설정 //////////-->
+            <div class="cont transSet invisible">
+                <img src="img/icoSend.ico"><h2>고객전화 발신번호 표시 선비스 환경을 설정합니다.</h2>
+        	    <div class="board">
+                    <div class="list01">
+                        <div class="listExplanation">
+                        <h3 class="listmargin" style="width: 130px;" >사용/미사용 선택</h3>
+                            <div class="whiteBar02"></div>
+                            <input type="radio" name="071" value="1" style="margin:30px 0px 0px 25px; float:left;"></input><label style="margin-top: 30px;">사용</label>
+                            <input type="radio" name="071" value="0" style="clear:none; float:left; margin:30px 0 0 30px;"></input><label style="margin-top: 30px;">미사용</label>
+                        </div>
+                        <div class="borderLine" style="margin-top: 40px;"></div>
+                    </div>
+                    <div class="list01">
+                        <div class="listExplanation">
+                            <p style="float:left; margin-top:40px;">올바른 발신번호 표시를 위해서는 정확한 개인정보 등록이 필요합니다.</p><button id="myinfoMod" class="btn btnBlue" style="margin:40px 0 0 25px;">개인정보수정</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!--////////// 발신표시 설정 끝 //////////-->
+
+            <!--////////// 도구모음 사용자 설정 //////////-->
+            <div class="cont userSet invisible">
+        	    <div class="board" style="margin-top:40px;">
+                    <div class="list01">
+                        <div class="listExplanation" style="height: 275PX; padding:15px 0 0 20px;">
+                            <h3 style="width: 80px; margin: -23px 0 0 20px; background: white;">기본 도구</h3>
+                            <div class="userSetico">
+                                <div class="userSeticowidth">
+                                    <img id="mail_img" class="mail_img ico"src="img/mail.ico"><input type="checkbox" name="051" id="051_1" value="1"></input><label>메일</label>
+                                </div>
+                                <div class="userSeticowidth">
+                                    <img id="letter_img" class="letter_img ico"src="img/letter.ico"><input type="checkbox" name="051" id="051_2" value="2"></input><label>쪽지</label>
+                                </div>
+                                <div class="userSeticowidth">
+                                    <img id="message_img" class="message_img ico"src="img/message.ico"><input type="checkbox" name="051" id="051_3" value="3" ></input><label>SMS</label>
+                                </div>
+
+                                <div class="userSeticowidth">
+                                    <img id="communicator_img" class="communicator_img ico"src="img/Communicator.ico"><input type="checkbox" name="051" id="051_4" value="4"></input><label>Communicator</label>
+                                </div>
+                                <div class="userSeticowidth">
+                                    <img id="diary_img" class="diary_img ico"src="img/Diary.ico"><input type="checkbox" name="051" id="051_5" value="5"></input><label>일정</label>
+                                </div>
+                                <div class="userSeticowidth">
+                                    <img id="mylink_img" class="mylink_img ico"src="img/Mylink.ico"><input type="checkbox" name="051" id="051_6" value="6"></input><label>My링크</label>
+                                </div>
+
+                                <div class="userSeticowidth">
+                                    <img id="place_img" class="place_img ico"src="img/place.ico"><input type="checkbox" name="051" id="051_7" value="7"></input><label>재석</label>
+                                </div>
+                                <div class="userSeticowidth">
+                                    <img id="auth_img" class="auth_img ico"src="img/auth.ico"><input type="checkbox" name="051" id="051_8" value="8"></input><label>인증센터</label>
+                                </div>
+                                <div class="userSeticowidth">
+                                    <img id="file_img" class="file_img ico"src="img/file.ico"><input type="checkbox" name="051" id="051_9" value="9"></input><label>파일전송</label>
+                                </div>
+
+                                <div class="userSeticowidth">
+                                    <img id="saver_img" class="saver_img ico"src="img/saver.ico"><input type="checkbox" name="051" id="051_10" value="10"></input><label>화면잠금</label>
+                                </div>
+                                <div class="userSeticowidth">
+                                    <img id="setting_img" class="setting_img ico"src="img/setting.ico"><input type="checkbox" name="051" id="051_11" value="11"></input><label>설정</label>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="borderLine" style="margin-top: 40px;"></div>
+                    </div>
+                    
+                    <div class="list01">
+                        <div class="listExplanation" style="float: left; width: 299px; height: 170px;">
+                        <h3 class="listmargin" style="width: 130px;">지원 도구</h3>
+                            <div class="usrSetSelect">
+                                <select name="052_1" id="052_1" size="6" multiple>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="float: left; width: 220px; margin-top: 25px;">
+                            <input type="button" id="btnLeft" class="usrbtn" value="&lt;&lt;" /><br>
+                            <input type="button" id="btnRight" class="usrbtn" value="&gt;&gt;" /><br>
+                        </div>
+                        <div class="listExplanation" style="float: left; width: 299px; height: 170px;">
+                        <h3 class="listmargin" style="width: 130px;">사용 도구</h3>
+                            <div class="usrSetSelect">
+                                <select name="052_2" id="052_2" size="6" multiple>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <!--////////// 도구모음 사용자 설정  끝 //////////-->
+
+            <!--////////// 인증서 정보  //////////-->
+            <div class="cont authInfo invisible">
+                <h2>인증서 정보 URL 이동</h2>
+            </div>
+            <!--////////// 인증서 정보  끝 //////////-->
+        </div>
+        
+        <section>
+        <!-- 팝업창-->
+		<div id="popup" class="layer-popup">
+		    <div class="popup-wrap">
+		        <h3 id=pop_title></h3>
+		            <a id="close" class="close">닫기</a>
+		        <div class="popup-body">
+			        <div class="view-table sch_table">
+	                    <div class="pop-cont">
+							<div>
+                                <div>
+                                    <label id="pop-label" class="poplabel"></label>
+                                    <input type="file" id="pop_005" class="invisible" accept=".wav" />
+                                    <input type="text" id="pop_006" class="invisible" />
+                                    <input type="text" id="pop_007" class="invisible" />
+                                    <input type="password" id="pop_021" class="invisible" />
+                                    <input type="password" id="pop_023" class="invisible" />
+                                    <input type="text" id="pop_031" class="invisible" />
+                                    <input type="text" id="pop_032" class="invisible" />
+                                    <input type="text" id="pop_033" class="invisible" />
+                                    <input type="text" id="pop_035" class="invisible" />
+                                    <input type="text" id="pop_041" class="invisible" />
+                                    <input type="text" id="pop_042" class="invisible" />
+                                </div>
+                                <div class="btn-div">
+                                    <button class="btn bg-light-blue" id="ok">확인</button>
+                                    <button id="closebtn" class="btn bg-grey">취소</button>
+                                </div>
+                            </div>
+						</div>	        
+					</div>					
+				</div>
+	        </div>
+	    </div>
+        </section>
+    </div>
+</body>
+</html>
