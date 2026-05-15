@@ -17,7 +17,7 @@ pip install -r requirements.txt
 # Run the application
 python main.py
 
-# Build standalone EXE
+# Build standalone EXE (사내망 Windows에서 실행)
 pip install pyinstaller
 pyinstaller build_exe.spec
 # Output: dist/KEPCO_RPA.exe
@@ -30,20 +30,38 @@ There are no tests or linting configured.
 ### Pipeline Flow
 
 ```
-auth.authenticate()  →  downloader.download_excel_to_dataframe()  →  processor.process_dataframe()  →  mailer.send_bizmail()
-   (PowerGate WSS)         (Work Monitor HTTP)                        (Classify + Excel)                (KEPCO BizMail)
+main.py (orchestrator)
+  ├── read_target_date()      ← 분류표.xlsx N2 (비어있으면 내일)
+  ├── read_department_code()   ← 분류표.xlsx M2 (비어있으면 "4200")
+  │
+  ├── [1/3] 인증 + 다운로드 (재시도 루프, 최대 10회)
+  │     ├── auth.authenticate()                    ← PowerGate WSS + GET 검증 (자체 재시도)
+  │     └── downloader.download_excel_to_dataframe() ← Work Monitor HTTP (열 ≤1이면 실패)
+  │         └── 다운로드 실패 시 → 재인증부터 다시 시도
+  │
+  ├── [2/3] 데이터 가공
+  │     ├── processor.load_classification_and_mail_config()
+  │     └── processor.process_dataframe()          ← 분류 + Excel 생성
+  │
+  └── [3/3] 메일 전송
+        └── mailer.send_bizmail()                  ← KEPCO BizMail
 ```
-
-A single `requests.Session` with PowerGate SSO cookies is created at startup and reused across all HTTP calls.
 
 ### Module Responsibilities
 
-- **main.py** - Orchestrator. Reads department code from `분류표.xlsx` cell M2, then runs the 4-step pipeline.
-- **auth.py** - Connects to local PowerGate via WebSocket (`ws://127.0.0.1:21777`), extracts SSO cookies (`pgsecuid`, `pgsecuid2`, `opv`), returns an authenticated `requests.Session`.
-- **downloader.py** - POSTs to Work Monitor's `/WORK/DAYWORK/excel_extract.php`. Auto-detects HTML vs Excel response format. Returns a `pandas.DataFrame`.
-- **processor.py** - Core business logic. Loads classification keywords and mail config from `분류표.xlsx`. Determines priority (1순위/2순위/3순위) per row based on category type and keyword matching. Generates formatted multi-sheet Excel (one sheet per D-column unique value).
-- **mailer.py** - Uploads attachment, validates recipients, sends via BizMail REST API. Uses list-of-tuples (not dict) for form data to support multiple recipients with the same `'to'` key.
+- **main.py** - Orchestrator. Reads target date (N2) and department code (M2) from `분류표.xlsx`. Runs 3-step pipeline with auth+download retry loop.
+- **auth.py** - Connects to local PowerGate via WebSocket (`ws://127.0.0.1:21777`), extracts SSO cookies (`pgsecuid`, `pgsecuid2`, `opv`), creates `requests.Session`, then validates via Work Monitor GET request. Retries up to 10 times with 2-second delay on validation failure.
+- **downloader.py** - POSTs to Work Monitor's `/WORK/DAYWORK/excel_extract.php`. Auto-detects HTML vs Excel response format. Validates DataFrame column count (≤1 column = server error). Returns a `pandas.DataFrame`.
+- **processor.py** - Core business logic. Loads classification keywords and mail config from `분류표.xlsx`. Determines priority (1순위/2순위/3순위) per row based on category type and keyword matching. Generates formatted multi-sheet Excel (one sheet per D-column unique value). Accepts `target_date_yymmdd` parameter for filename.
+- **mailer.py** - Uploads attachment, validates recipients, sends via BizMail REST API. Uses list-of-tuples (not dict) for form data to support multiple recipients with the same `'to'` key. Accepts `date_yymmdd`, `date_yy_mm_dd` parameters for subject/body.
 - **config.py** - Centralized paths, URLs, timeouts. `get_base_dir()` handles both script and PyInstaller exe contexts.
+
+### Retry & Validation Strategy
+
+Two failure modes are handled:
+
+1. **SSO 미완료** (PowerGate 초기화 타이밍): `auth.py`가 Work Monitor GET 요청으로 세션 검증, 실패 시 자체 재시도 (최대 10회)
+2. **서버 일시 오류** (Work Monitor 내부 오류): `downloader.py`가 DataFrame 열 개수 검증 (≤1이면 None 반환), `main.py`가 재인증부터 다시 시도 (최대 10회)
 
 ### Critical Data File: 분류표.xlsx
 
@@ -52,8 +70,19 @@ This Excel file drives all business rules and is the only file end-users edit:
 - **Sheet 1**: Classification keywords (A-F columns by category), special override rules (I-K columns)
 - **Sheet 2**: Mail config — sender (A2, B2), recipients (D2:D*n*), subject (E2), body (F2)
 - **Cell M2**: Department code (overrides `config.DEPARTMENT_CODE` fallback)
+- **Cell N2**: Target date (YYYY-MM-DD format or Excel date, empty = tomorrow)
 
-Subject and body support `{DATE}` placeholder (auto-replaced with tomorrow's date).
+Subject and body support `{DATE}` placeholder (auto-replaced with target date).
+
+### Date Parameter Flow
+
+Target date is read once from `분류표.xlsx` N2 and passed through the entire pipeline:
+
+| Format | Usage | Example |
+|--------|-------|---------|
+| `YYYY-MM-DD` | downloader `date_from` | `2025-03-01` |
+| `YYMMDD` | processor filename, mailer subject `{DATE}` | `250301` |
+| `'YY-MM-DD` | mailer body `{DATE}` | `'25-03-01` |
 
 ### Priority Classification Logic (processor.py)
 
@@ -66,8 +95,10 @@ Subject and body support `{DATE}` placeholder (auto-replaced with tomorrow's dat
 
 - **In-memory processing**: DataFrame stays in memory; only one disk write for the final Excel output
 - **HTML detection**: Work Monitor sometimes returns HTML tables instead of Excel — `downloader.py` handles both via content-type sniffing
+- **Column validation**: Server errors return 1-column DataFrame with error message — detected and treated as download failure
 - **Multi-recipient fix**: BizMail API requires each recipient as a separate `'to'` form field — uses `list[tuple]` instead of `dict`
 - **Path abstraction**: `config.get_base_dir()` uses `sys.frozen` to detect PyInstaller runtime
+- **Centralized date**: All modules receive date from `main.py` instead of independently calculating tomorrow
 
 ## Internal URLs (KEPCO Intranet Only)
 

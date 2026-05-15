@@ -63,6 +63,11 @@ def upload_files(session, file_paths):
                     timeout=HTTP_TIMEOUT
                 )
 
+                print(f"    [DEBUG] 업로드 응답 status: {resp.status_code}")
+                print(f"    [DEBUG] 업로드 응답 headers: {dict(resp.headers)}")
+                print(f"    [DEBUG] 업로드 응답 body: {resp.text[:500]}")
+                print(f"    [DEBUG] 세션 쿠키: {dict(session.cookies)}")
+
                 result = resp.json()
 
                 if result.get('result') == 1 and 'filekey' in result:
