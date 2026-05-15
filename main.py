@@ -209,10 +209,16 @@ def main():
             print("  2. 시트 2에 메일 설정 정보가 올바르게 입력되어 있는지 확인하세요")
             return
 
+        # 서울본부 위험순위 룰 + 협력사 제재현황 로드 (시트 없으면 비활성)
+        seoul_rules = processor.load_seoul_rules(classification_file)
+        sanctions = processor.load_sanctions(classification_file)
+
         # Process DataFrame and save to Excel
         output_file = processor.process_dataframe(
             df, keywords, special_rules,
-            target_date_yymmdd=target_date_yymmdd
+            target_date_yymmdd=target_date_yymmdd,
+            seoul_rules=seoul_rules,
+            sanctions=sanctions,
         )
 
         if output_file is None or not os.path.exists(output_file):
@@ -261,9 +267,6 @@ def main():
 
     finally:
         print_footer(success)
-
-        # 창 닫기 방지 (Enter 키 대기)
-        input("\n프로그램을 종료하려면 Enter 키를 누르세요...")
 
 
 if __name__ == '__main__':

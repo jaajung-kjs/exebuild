@@ -7,8 +7,13 @@ from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
 from datetime import datetime, timedelta
 import os
+import re
 import pandas as pd
 from config import get_classification_file_path, get_output_dir
+
+SEOUL_RULES_SHEET = '서울본부 위험순위'
+SEOUL_RULES_ROWS = (2, 8)        # 7개 항목: 2~8행
+SEOUL_SANCTIONS_START_ROW = 2    # 우측 H~J: 2행부터 빈 행까지
 
 
 def load_classification_and_mail_config(classification_file):
@@ -171,6 +176,242 @@ def contains_keyword(text, keyword_list):
     return False
 
 
+# ============================================================
+# 서울본부 위험순위 (PDF 룰)
+# ============================================================
+def _split_keywords(cell_value):
+    """셀 값에서 콤마 구분 키워드 리스트 반환 (빈 값/None은 [])"""
+    if cell_value is None:
+        return []
+    s = str(cell_value).strip()
+    if not s:
+        return []
+    return [k.strip() for k in s.split(',') if k.strip()]
+
+
+def load_seoul_rules(classification_file):
+    """
+    "서울본부 위험순위" 시트의 좌측 (A~F) 7개 항목 룰 로드.
+
+    Returns:
+        list[dict]: [{'no': 1, 'name': '전주오름공종', 'col': 'S',
+                     'p1': ['인력오름'], 'p2': [], 'p3': []}, ...]
+    """
+    wb = load_workbook(classification_file, data_only=True)
+    if SEOUL_RULES_SHEET not in wb.sheetnames:
+        wb.close()
+        print(f"  [경고] '{SEOUL_RULES_SHEET}' 시트가 없습니다. 서울본부 룰 비활성화")
+        return []
+
+    ws = wb[SEOUL_RULES_SHEET]
+    rules = []
+    for r in range(SEOUL_RULES_ROWS[0], SEOUL_RULES_ROWS[1] + 1):
+        no = ws.cell(row=r, column=1).value
+        name = ws.cell(row=r, column=2).value
+        col = ws.cell(row=r, column=3).value
+        if no is None or name is None or col is None:
+            continue
+        rules.append({
+            'no': int(no),
+            'name': str(name).strip(),
+            'col': str(col).strip().upper(),
+            'p1': _split_keywords(ws.cell(row=r, column=4).value),
+            'p2': _split_keywords(ws.cell(row=r, column=5).value),
+            'p3': _split_keywords(ws.cell(row=r, column=6).value),
+        })
+    wb.close()
+
+    print(f"\n[서울본부 위험순위 룰] {len(rules)}개 항목 로드")
+    for rule in rules:
+        print(f"  {rule['no']}. {rule['name']} ({rule['col']}열) "
+              f"- 1순위:{rule['p1']} 2순위:{rule['p2']} 3순위:{rule['p3']}")
+    return rules
+
+
+def load_sanctions(classification_file):
+    """
+    "서울본부 위험순위" 시트의 우측 (H~J) 제재현황 로드.
+
+    Returns:
+        dict: {'협력사명': (지도서수, 계도서수)}
+    """
+    wb = load_workbook(classification_file, data_only=True)
+    if SEOUL_RULES_SHEET not in wb.sheetnames:
+        wb.close()
+        return {}
+
+    ws = wb[SEOUL_RULES_SHEET]
+    sanctions = {}
+    r = SEOUL_SANCTIONS_START_ROW
+    while r <= ws.max_row:
+        name = ws.cell(row=r, column=8).value  # H열
+        if name is None or str(name).strip() == '':
+            break
+        jido = ws.cell(row=r, column=9).value or 0   # I열: 지도서
+        gye = ws.cell(row=r, column=10).value or 0   # J열: 계도서
+        sanctions[str(name).strip()] = (int(jido), int(gye))
+        r += 1
+    wb.close()
+
+    print(f"\n[제재현황] {len(sanctions)}개 협력사 로드")
+    return sanctions
+
+
+def _parse_time_range(spec):
+    """'21:00-09:00' 형식을 (start_min, end_min) 분 단위 튜플로 파싱"""
+    m = re.match(r'(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})', spec.strip())
+    if not m:
+        return None
+    sh, sm, eh, em = (int(x) for x in m.groups())
+    return sh * 60 + sm, eh * 60 + em
+
+
+def _extract_start_minutes(cell_value):
+    """'2025-11-19 09:00 ~ 2025-11-19 18:00' 등에서 시작 시:분(분 단위) 추출.
+       추출 실패 시 None 반환."""
+    if cell_value is None:
+        return None
+    s = str(cell_value).strip()
+    if not s or s == '-':
+        return None
+    m = re.search(r'(\d{1,2}):(\d{2})', s)
+    if not m:
+        return None
+    return int(m.group(1)) * 60 + int(m.group(2))
+
+
+def _time_in_range(start_min, range_spec):
+    """start_min(분)이 'HH:MM-HH:MM' 범위에 포함되는지 (자정 가로지름 지원)"""
+    parsed = _parse_time_range(range_spec)
+    if parsed is None or start_min is None:
+        return False
+    rs, re_ = parsed
+    if rs <= re_:
+        return rs <= start_min < re_
+    # 자정 가로지름: 21:00-09:00 → start ≥ 21:00 OR start < 09:00
+    return start_min >= rs or start_min < re_
+
+
+def _evaluate_rule(rule, row_data, sanctions):
+    """
+    한 룰에 대한 점수 반환:
+      1 = 1순위 매칭, 2 = 2순위 매칭, 3 = 3순위 매칭, 4 = 해당없음
+    항목번호별 매칭 방식 분기.
+    """
+    no = rule['no']
+    cell_value = row_data.get(rule['col'], '')
+    if cell_value is None or (isinstance(cell_value, float) and pd.isna(cell_value)):
+        cell_value = None
+        cell_str = ''
+    else:
+        cell_str = str(cell_value).strip()
+
+    # ⑥ 제재여부: 협력사명으로 sanctions lookup
+    if no == 6:
+        record = sanctions.get(cell_str)
+        if record is None:
+            return 4
+        jido, gye = record
+        if jido > 0:
+            return 1
+        if gye > 0:
+            return 2
+        return 4
+
+    # ③ 작업예정일시: 시간 범위 매칭
+    if no == 3:
+        start_min = _extract_start_minutes(cell_value)
+        if start_min is None:
+            return 4
+        for prio, kws in [(1, rule['p1']), (2, rule['p2']), (3, rule['p3'])]:
+            for kw in kws:
+                if kw == '*':
+                    continue
+                if _time_in_range(start_min, kw):
+                    return prio
+        return 4
+
+    # ⑤ 안전모니터링 (와일드카드 '*' 지원): 1·3순위 모두 안 걸리면 '*' 있는 순위
+    if no == 5:
+        # 1순위: 미배치/미입력/-/공백 → 셀이 비었거나 키워드 매칭
+        if not cell_str or cell_str == '-':
+            return 1
+        for kw in rule['p1']:
+            if kw == '*':
+                continue
+            if kw in cell_str:
+                return 1
+        # 3순위: '감리' 포함
+        for kw in rule['p3']:
+            if kw == '*':
+                continue
+            if kw in cell_str:
+                return 3
+        # 2순위 (와일드카드 자동)
+        if '*' in rule['p2']:
+            return 2
+        # 와일드카드 없을 때 명시적 매칭
+        for kw in rule['p2']:
+            if kw in cell_str:
+                return 2
+        return 4
+
+    # ①②④⑦: 일반 contains 매칭
+    for prio, kws in [(1, rule['p1']), (2, rule['p2']), (3, rule['p3'])]:
+        for kw in kws:
+            if kw == '*':
+                continue
+            if kw in cell_str:
+                return prio
+    return 4
+
+
+def evaluate_seoul_priority(row_data, rules, sanctions, current_priority):
+    """
+    서울본부 PDF 룰로 행을 평가.
+
+    Args:
+        row_data: 행 데이터 (열 문자 → 값)
+        rules: load_seoul_rules() 결과
+        sanctions: load_sanctions() 결과
+        current_priority: 기존 키워드 로직 결과 ('1순위'/'2순위'/'3순위')
+
+    Returns:
+        tuple: (final_priority, sub_ranks_tuple, jido_count)
+            - sub_ranks_tuple: 길이 7 (정렬 키)
+            - jido_count: ⑥ 동률 시 정렬용 (지도서 횟수)
+    """
+    # 룰 비활성/룰 없음 → 기존 그대로
+    if not rules:
+        return current_priority, (4,) * 7, 0
+
+    scores = [_evaluate_rule(rule, row_data, sanctions) for rule in rules]
+    has_p1 = any(s == 1 for s in scores)
+    has_p2 = any(s == 2 for s in scores)
+
+    # ⑥ 지도서 횟수 (정렬 동률 처리용)
+    jido = 0
+    for rule in rules:
+        if rule['no'] == 6:
+            name = str(row_data.get(rule['col'], '')).strip()
+            jido = sanctions.get(name, (0, 0))[0]
+            break
+
+    # 기존 1순위 강등 룰
+    final = current_priority
+    if current_priority == '1순위':
+        if has_p1:
+            final = '1순위'
+        elif has_p2:
+            final = '2순위'  # 강등
+        else:
+            final = '1순위'  # PDF 매칭 없음 → 유지
+
+    # 7개 항목 점수 튜플 (정렬용)
+    sub_ranks = tuple(scores) + (4,) * (7 - len(scores))
+    return final, sub_ranks, jido
+
+
 def determine_priority(row_data, keywords, special_rules):
     """
     행 데이터를 기반으로 점검순위 결정
@@ -259,7 +500,8 @@ def col_letter_to_index(letter):
     return result
 
 
-def process_dataframe(df, keywords, special_rules, target_date_yymmdd=None):
+def process_dataframe(df, keywords, special_rules, target_date_yymmdd=None,
+                      seoul_rules=None, sanctions=None):
     """
     Process DataFrame and save as Excel with priority classification
 
@@ -268,6 +510,8 @@ def process_dataframe(df, keywords, special_rules, target_date_yymmdd=None):
         keywords: classification keywords
         special_rules: special priority rules
         target_date_yymmdd: target date in YYMMDD format (default: tomorrow)
+        seoul_rules: 서울본부 PDF 룰 (load_seoul_rules 결과). 없으면 1순위 강등/정렬 비활성
+        sanctions: 협력사 제재현황 (load_sanctions 결과)
 
     Returns:
         str: Output file path
@@ -281,13 +525,14 @@ def process_dataframe(df, keywords, special_rules, target_date_yymmdd=None):
     # 1. 불필요한 열 삭제 (DataFrame에서 직접)
     print(f"\n  불필요한 열 삭제 중...")
 
-    # 열 인덱스로 삭제할 범위 계산 (0-based index)
-    # P~T: 15~19, W~Y: 22~24, AB~AE: 27~30
+    # 원본 열 인덱스로 삭제할 범위 (0-based)
+    # 보존: T(안전담당자, idx 19) — ⑤ 안전모니터링 매칭에 필요
+    # 삭제: P~S(15~18), W~Y(22~24), AB~AE(27~30)
     cols_to_drop = []
 
-    # P(16열) ~ T(20열)
-    if len(df.columns) >= 20:
-        cols_to_drop.extend(df.columns[15:20].tolist())
+    # P(16열) ~ S(19열): 안전대책/현장책임자/작업자명단/장비현황
+    if len(df.columns) >= 19:
+        cols_to_drop.extend(df.columns[15:19].tolist())
 
     # W(23열) ~ Y(25열)
     if len(df.columns) >= 25:
@@ -323,14 +568,66 @@ def process_dataframe(df, keywords, special_rules, target_date_yymmdd=None):
     # 점검순위 열 추가
     df['점검순위'] = priorities
 
-    print(f"\n  점검순위 할당 완료:")
+    print(f"\n  기존 점검순위 (1차 분류):")
     print(f"    1순위: {priority_counts['1순위']}건")
     print(f"    2순위: {priority_counts['2순위']}건")
     print(f"    3순위: {priority_counts['3순위']}건")
 
-    # 3. A열 기준 오름차순 정렬
-    print(f"\n  첫 번째 열 기준 정렬 중...")
-    df = df.sort_values(by=df.columns[0], ascending=True)
+    # 2-2. 서울본부 PDF 룰 적용 (1순위 강등 + 정렬용 sub_ranks 부여)
+    if seoul_rules:
+        print(f"\n  서울본부 위험순위 룰 적용 중...")
+        sanctions = sanctions or {}
+        final_priorities = []
+        sub_ranks_list = []
+        jido_list = []
+        demoted_count = 0
+
+        for idx, row in df.iterrows():
+            row_data = {}
+            for col_idx, col_name in enumerate(df.columns):
+                col_letter = index_to_col_letter(col_idx + 1)
+                row_data[col_letter] = row[col_name]
+
+            current = row['점검순위']
+            final, sub_ranks, jido = evaluate_seoul_priority(
+                row_data, seoul_rules, sanctions, current
+            )
+            if current == '1순위' and final != '1순위':
+                demoted_count += 1
+            final_priorities.append(final)
+            sub_ranks_list.append(sub_ranks)
+            jido_list.append(jido)
+
+        df['점검순위'] = final_priorities
+        df['_sub_ranks'] = sub_ranks_list
+        df['_jido'] = jido_list
+
+        new_counts = {p: final_priorities.count(p) for p in ('1순위', '2순위', '3순위')}
+        print(f"  최종 점검순위 (PDF 룰 적용 후):")
+        print(f"    1순위: {new_counts['1순위']}건  (기존 1순위 중 {demoted_count}건 → 2순위 강등)")
+        print(f"    2순위: {new_counts['2순위']}건")
+        print(f"    3순위: {new_counts['3순위']}건")
+
+        # 3. 정렬: 점검순위 → 1순위 그룹 안에서 sub_ranks 사전식 → ⑥ 동률 시 -지도서수
+        print(f"\n  정렬 중 (점검순위 → 서울본부 룰 → 첫 열)...")
+        priority_order = {'1순위': 0, '2순위': 1, '3순위': 2}
+        df['_p_order'] = df['점검순위'].map(priority_order).fillna(9).astype(int)
+        df['_neg_jido'] = -df['_jido']
+
+        # sub_ranks 튜플을 7개 컬럼으로 분해
+        for i in range(7):
+            df[f'_sr{i}'] = df['_sub_ranks'].apply(lambda t: t[i])
+
+        sort_cols = ['_p_order'] + [f'_sr{i}' for i in range(7)] + ['_neg_jido', df.columns[0]]
+        df = df.sort_values(by=sort_cols, ascending=True)
+
+        # 임시 컬럼 정리
+        df = df.drop(columns=['_sub_ranks', '_jido', '_p_order', '_neg_jido']
+                     + [f'_sr{i}' for i in range(7)])
+    else:
+        # 서울본부 룰 없음 → 기존 동작 (A열 정렬)
+        print(f"\n  첫 번째 열 기준 정렬 중...")
+        df = df.sort_values(by=df.columns[0], ascending=True)
 
     # 4. 최종 파일 저장 (openpyxl로 서식 적용)
     print(f"\n  Excel 서식 적용 및 저장 중...")
