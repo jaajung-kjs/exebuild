@@ -52,11 +52,16 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None, departmen
     print(f"  날짜 범위: {date_range}")
     print(f"  담당부서 코드: {department_code}")
 
-    # Update session headers
+    # safeRPA/excel_download.py 의 헤더를 그대로 사용 (검증된 동작 헤더)
+    # Content-Type 은 세션이 아닌 POST 요청별로만 지정 → 세션 오염 방지
     session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
         'Origin': WORK_MONITOR_URL,
         'Referer': f'{WORK_MONITOR_URL}/WORK/DAYWORK/list.php',
-        'Content-Type': 'application/x-www-form-urlencoded',
         'Upgrade-Insecure-Requests': '1',
     })
 
@@ -86,6 +91,7 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None, departmen
         response = session.post(
             f'{WORK_MONITOR_URL}/WORK/DAYWORK/excel_extract.php',
             data=data,
+            headers={'Content-Type': 'application/x-www-form-urlencoded'},
             stream=True,
             timeout=HTTP_TIMEOUT
         )
