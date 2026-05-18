@@ -50,7 +50,7 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None, departmen
     print(f"  페이지: {PAGE}")
     print(f"  항목 수: {LIST_COUNT}개")
     print(f"  날짜 범위: {date_range}")
-    print(f"  담당부서: {department_code} (강원본부)")
+    print(f"  담당부서 코드: {department_code}")
 
     # Update session headers
     session.headers.update({

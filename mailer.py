@@ -113,9 +113,13 @@ def send_bizmail(session, mail_config, attachment_paths=None, date_yymmdd=None, 
     print("메일 전송")
     print("=" * 60)
 
-    # Update session headers
+    # safeRPA/bizmail_send.py 의 헤더를 그대로 사용 (검증된 동작 헤더)
     session.headers.update({
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/javascript, */*; q=0.01',
+        'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
+        'Accept-Encoding': 'gzip, deflate',
+        'Connection': 'keep-alive',
         'Origin': BIZMAIL_URL,
         'Referer': f'{BIZMAIL_URL}/mail/list.do',
         'X-Requested-With': 'XMLHttpRequest',
