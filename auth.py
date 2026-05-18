@@ -18,7 +18,7 @@ async def get_powergate_cookies():
         None: If authentication fails
     """
     try:
-        async with websockets.connect(POWERGATE_WS_URI, timeout=WEBSOCKET_TIMEOUT) as ws:
+        async with websockets.connect(POWERGATE_WS_URI, open_timeout=WEBSOCKET_TIMEOUT) as ws:
             # Send authentication request
             await ws.send(";;;GETCONFIGep;")
 
