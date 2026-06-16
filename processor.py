@@ -501,7 +501,8 @@ def col_letter_to_index(letter):
 
 
 def process_dataframe(df, keywords, special_rules, target_date_yymmdd=None,
-                      seoul_rules=None, sanctions=None):
+                      seoul_rules=None, sanctions=None,
+                      drop_columns_override=None):
     """
     Process DataFrame and save as Excel with priority classification
 
@@ -512,6 +513,8 @@ def process_dataframe(df, keywords, special_rules, target_date_yymmdd=None,
         target_date_yymmdd: target date in YYMMDD format (default: tomorrow)
         seoul_rules: 서울본부 PDF 룰 (load_seoul_rules 결과). 없으면 1순위 강등/정렬 비활성
         sanctions: 협력사 제재현황 (load_sanctions 결과)
+        drop_columns_override: drop 컬럼 리스트 강제 지정 (본부별 변형용).
+            None → 기본 drop 적용, [] → drop 없음(전 컬럼 보존), [...] → 지정 컬럼만 drop
 
     Returns:
         str: Output file path
@@ -525,22 +528,27 @@ def process_dataframe(df, keywords, special_rules, target_date_yymmdd=None,
     # 1. 불필요한 열 삭제 (DataFrame에서 직접)
     print(f"\n  불필요한 열 삭제 중...")
 
-    # 원본 열 인덱스로 삭제할 범위 (0-based)
-    # 보존: T(안전담당자, idx 19) — ⑤ 안전모니터링 매칭에 필요
-    # 삭제: P~S(15~18), W~Y(22~24), AB~AE(27~30)
-    cols_to_drop = []
+    if drop_columns_override is not None:
+        cols_to_drop = list(drop_columns_override)
+        if not cols_to_drop:
+            print(f"  (drop 없음 — 전 컬럼 보존)")
+    else:
+        # 기본 drop 룰
+        # 보존: T(안전담당자, idx 19) — ⑤ 안전모니터링 매칭에 필요
+        # 삭제: P~S(15~18), W~Y(22~24), AB~AE(27~30)
+        cols_to_drop = []
 
-    # P(16열) ~ S(19열): 안전대책/현장책임자/작업자명단/장비현황
-    if len(df.columns) >= 19:
-        cols_to_drop.extend(df.columns[15:19].tolist())
+        # P(16열) ~ S(19열): 안전대책/현장책임자/작업자명단/장비현황
+        if len(df.columns) >= 19:
+            cols_to_drop.extend(df.columns[15:19].tolist())
 
-    # W(23열) ~ Y(25열)
-    if len(df.columns) >= 25:
-        cols_to_drop.extend(df.columns[22:25].tolist())
+        # W(23열) ~ Y(25열)
+        if len(df.columns) >= 25:
+            cols_to_drop.extend(df.columns[22:25].tolist())
 
-    # AB(28열) ~ AE(31열)
-    if len(df.columns) >= 31:
-        cols_to_drop.extend(df.columns[27:31].tolist())
+        # AB(28열) ~ AE(31열)
+        if len(df.columns) >= 31:
+            cols_to_drop.extend(df.columns[27:31].tolist())
 
     df = df.drop(columns=cols_to_drop, errors='ignore')
     print(f"  삭제 후 크기: {len(df)} 행 x {len(df.columns)} 열")

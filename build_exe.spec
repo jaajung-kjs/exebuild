@@ -7,7 +7,7 @@ Build command: pyinstaller build_exe.spec
 block_cipher = None
 
 a = Analysis(
-    ['main.py'],
+    ['main_경남.py'],
     pathex=[],
     binaries=[],
     datas=[
