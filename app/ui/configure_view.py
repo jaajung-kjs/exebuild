@@ -4,13 +4,14 @@
 
 from PySide6.QtWidgets import (
     QWidget, QFrame, QScrollArea, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
-    QPushButton, QCheckBox, QTableWidget, QTableWidgetItem, QComboBox,
+    QPushButton, QCheckBox, QTableWidget, QTableWidgetItem,
     QLineEdit, QColorDialog,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
 from app.core.settings import Rule, Filter
+from app.ui.widgets import NoScrollComboBox
 
 PREVIEW_ROWS = 20
 
@@ -154,11 +155,11 @@ class ConfigureView(QWidget):
         row.setSpacing(20)
         left = QVBoxLayout(); left.setSpacing(5)
         left.addWidget(QLabel("행 정렬 순서", objectName="FieldLabel"))
-        self.sort_combo = QComboBox(); self.sort_combo.setMinimumHeight(34)
+        self.sort_combo = NoScrollComboBox(); self.sort_combo.setMinimumHeight(34)
         left.addWidget(self.sort_combo)
         right = QVBoxLayout(); right.setSpacing(5)
         right.addWidget(QLabel("이 항목별로 시트 나누기", objectName="FieldLabel"))
-        self.split_combo = QComboBox(); self.split_combo.setMinimumHeight(34)
+        self.split_combo = NoScrollComboBox(); self.split_combo.setMinimumHeight(34)
         right.addWidget(self.split_combo)
         row.addLayout(left); row.addLayout(right)
         lay.addLayout(row)
@@ -181,14 +182,14 @@ class ConfigureView(QWidget):
 
     # ---------- 공통 위젯 ----------
     def _col_combo(self):
-        c = QComboBox()
+        c = NoScrollComboBox()
         c.setMinimumHeight(32)
         c.setMinimumWidth(130)
         c.addItems(self.state.columns())
         return c
 
     def _mapped_combo(self, opts, width=130):
-        c = QComboBox()
+        c = NoScrollComboBox()
         c.setMinimumHeight(32)
         c.setMinimumWidth(width)
         for label, val in opts:

@@ -8,8 +8,10 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextCharFormat, QFont, QColor
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit,
-    QPlainTextEdit, QTextEdit, QComboBox, QPushButton, QLabel, QColorDialog,
+    QPlainTextEdit, QTextEdit, QPushButton, QLabel, QColorDialog,
 )
+
+from app.ui.widgets import NoScrollComboBox
 
 FONT_SIZES = ["10", "11", "12", "14", "16", "18", "20", "24", "28"]
 
@@ -85,7 +87,7 @@ class MailView(QWidget):
         self.color_btn.setMinimumHeight(30)
         self.color_btn.clicked.connect(self._pick_color)
 
-        self.size_combo = QComboBox()
+        self.size_combo = NoScrollComboBox()
         self.size_combo.addItems(FONT_SIZES)
         self.size_combo.setCurrentText("12")
         self.size_combo.setFixedWidth(64)

@@ -16,6 +16,7 @@ a = Analysis(
     ],
     hiddenimports=[
         'PySide6',
+        'PySide6.QtSvg',
         'websockets',
         'requests',
         'pandas',

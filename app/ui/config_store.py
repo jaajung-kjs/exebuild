@@ -28,7 +28,8 @@ def load_config() -> Preset:
             return Preset.from_dict(json.loads(raw))
         except (ValueError, TypeError):
             pass
-    return Preset(name="기본 설정", department_code="")
+    # 기본값: 2차사업소별로 시트 나누기
+    return Preset(name="기본 설정", department_code="", sheet_split_column="2차사업소")
 
 
 def save_config(preset: Preset) -> None:
