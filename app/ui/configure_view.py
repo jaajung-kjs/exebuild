@@ -27,6 +27,7 @@ FILTER_OPTS = [
 ]
 MODE_OPTS = [("모두 만족(AND)", "and"), ("하나라도 만족(OR)", "or")]
 NO_VALUE_OPS = {"not_null", "is_empty"}
+DEFAULT_SPLIT = "2차사업소"   # 시트 나누기 기본 기준 열
 _SWATCH_QSS = ("background:{c}; color:#1B2430; border:1px solid rgba(0,0,0,0.18); "
                "border-radius:6px; padding:4px 10px; font-weight:700;")
 
@@ -329,7 +330,8 @@ class ConfigureView(QWidget):
         self.split_combo.clear()
         self.split_combo.addItem("나누지 않음", "")
         for c in cols:
-            self.split_combo.addItem(f"{c} 별로", c)
+            label = f"{c} 별로" + ("  (기본값)" if c == DEFAULT_SPLIT else "")
+            self.split_combo.addItem(label, c)
 
     def apply_preset(self, preset):
         cols = self.state.columns()
@@ -349,7 +351,7 @@ class ConfigureView(QWidget):
         # 정렬·시트 분리
         self._set_data(self.sort_combo, preset.sort or "none")
         # 저장된 값이 없으면 기본으로 '2차사업소별로' 선택
-        self._set_data(self.split_combo, preset.sheet_split_column or "2차사업소")
+        self._set_data(self.split_combo, preset.sheet_split_column or DEFAULT_SPLIT)
 
     def write_into(self, preset):
         # 데이터 미로드 상태에서는 설정 위젯이 비어 있으므로,
