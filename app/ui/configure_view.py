@@ -186,6 +186,10 @@ class ConfigureView(QWidget):
         self.split_combo.setCurrentText(preset.sheet_split_column)
 
     def write_into(self, preset):
+        # 데이터 미로드 상태에서는 설정 위젯이 비어 있으므로,
+        # 기존 프리셋 값을 덮어쓰지 않도록 아무것도 기록하지 않는다.
+        if self.state.df is None:
+            return
         preset.drop_columns = [
             self.drop_list.item(i).text()
             for i in range(self.drop_list.count())
@@ -223,8 +227,8 @@ class ConfigureView(QWidget):
         out = str(app_paths.output_dir() / f"{fmts['yymmdd']} 공사현장 점검 우선순위 리스트.xlsx")
         try:
             write_excel(processed, out, self.state.preset.sheet_split_column)
-        except PermissionError:
-            QMessageBox.critical(self, "저장 실패", "파일이 열려 있으면 닫고 다시 시도하세요.")
+        except (PermissionError, OSError) as e:
+            QMessageBox.critical(self, "저장 실패", f"파일 저장에 실패했습니다.\n파일이 열려 있으면 닫고 다시 시도하세요.\n{e}")
             return
         self.state.output_path = out
         QMessageBox.information(self, "생성 완료", f"저장됨:\n{out}")
