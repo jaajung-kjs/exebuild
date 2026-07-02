@@ -18,17 +18,20 @@ class DownloadWorker(QThread):
 
     def run(self):
         try:
+            # 재시도 없음(1회). 서버 엑셀 생성이 느려도(수십 초) 넉넉한 타임아웃으로 기다린다.
+            self.status.emit("인증 및 다운로드 중… (서버 생성에 수십 초 걸릴 수 있으니 기다려 주세요)")
             session, df = run_auth_and_download(
                 authenticate=auth.authenticate,
                 download=downloader.download_excel_to_dataframe,
                 date_from=self._date_from,
                 department_code=self._dept,
-                on_status=self.status.emit,
+                max_retries=1,
             )
             if df is None:
                 self.failed.emit(
-                    "인증+다운로드에 실패했습니다.\n"
-                    "· PowerGate 실행 여부\n· 사내망 연결\n· 해당 날짜 데이터 유무를 확인하세요."
+                    "인증 또는 다운로드에 실패했습니다.\n"
+                    "· PowerGate 실행\n· 사내망 연결\n· 해당 날짜 데이터 유무를 확인한 뒤 "
+                    "다시 [실행]하세요."
                 )
             else:
                 self.done.emit(session, df)
