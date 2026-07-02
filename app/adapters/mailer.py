@@ -1,6 +1,6 @@
 """
 BizMail sending module
-Uses dynamic mail configuration from 분류표.xlsx sheet 2
+메일 설정(발신·수신·제목·본문)은 UI에서 편집한 값을 dict로 받아 발송한다.
 """
 
 import requests

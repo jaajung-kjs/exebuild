@@ -33,11 +33,14 @@ Thumbs.db
 # PowerGate (local tool, not part of project)
 PowerGate/
 
-# Project specific
+# Project specific (엑셀 산출물 등 — 저장소에 넣지 않음)
 *.xls
 *.xlsx
-!분류표.xlsx
 *.log
+*.pdf
+
+# UI 미리보기 이미지(로컬 전용)
+미리보기/
 
 # PyInstaller
 *.manifest

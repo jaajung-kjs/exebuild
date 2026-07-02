@@ -34,7 +34,7 @@ BIZMAIL_URL = "http://bizmail.kepco.co.kr"
 POWERGATE_WS_URI = "ws://127.0.0.1:21777"
 
 # Work Monitor settings
-DEPARTMENT_CODE = "4200"  # 강원본부 (Fallback - actual value read from 분류표.xlsx M2)
+DEPARTMENT_CODE = "4200"  # 강원본부 (fallback — 실제 값은 UI에서 선택한 본부 코드)
 LIST_COUNT = 1000
 PAGE = 1
 
