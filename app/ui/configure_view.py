@@ -3,8 +3,8 @@
 설정(프리셋) 편집 전용. 실제 실행(다운로드·저장·메일)은 ①실행 화면에서만 한다."""
 
 from PySide6.QtWidgets import (
-    QWidget, QFrame, QScrollArea, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
-    QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem, QComboBox,
+    QWidget, QFrame, QScrollArea, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
+    QPushButton, QCheckBox, QTableWidget, QTableWidgetItem, QComboBox,
     QLineEdit, QColorDialog,
 )
 from PySide6.QtCore import Qt
@@ -40,6 +40,7 @@ class ConfigureView(QWidget):
         self.main = main
         self.rule_rows = []      # [{frame, col, kw, match, prio, color}]
         self.filter_rows = []    # [{frame, col, op, val}]
+        self.include_checks = [] # 컬럼 포함 체크박스 리스트
 
         v = QVBoxLayout(self)
         v.setContentsMargins(32, 28, 32, 20)
@@ -108,11 +109,11 @@ class ConfigureView(QWidget):
         none_btn.clicked.connect(lambda: self._check_all(False))
         bar.addWidget(all_btn); bar.addWidget(none_btn); bar.addStretch(1)
         lay.addLayout(bar)
-        self.include_list = QListWidget(objectName="DropList")
-        self.include_list.setFrameShape(QFrame.NoFrame)
-        self.include_list.setMinimumHeight(120)
-        self.include_list.setMaximumHeight(190)
-        lay.addWidget(self.include_list)
+        # 컬럼 체크박스 3열 그리드 (스크롤 줄이기)
+        self.include_grid = QGridLayout()
+        self.include_grid.setHorizontalSpacing(18)
+        self.include_grid.setVerticalSpacing(7)
+        lay.addLayout(self.include_grid)
         return card
 
     def _rules_card(self):
@@ -307,9 +308,8 @@ class ConfigureView(QWidget):
         rows.clear()
 
     def _check_all(self, checked: bool):
-        state = Qt.Checked if checked else Qt.Unchecked
-        for i in range(self.include_list.count()):
-            self.include_list.item(i).setCheckState(state)
+        for cb in self.include_checks:
+            cb.setChecked(checked)
 
     def _pick_color(self, btn):
         cur = QColor(btn.property("hex"))
@@ -322,12 +322,21 @@ class ConfigureView(QWidget):
     def populate_columns(self):
         """고정 컬럼(또는 다운로드된 컬럼)으로 설정 위젯을 채운다. 다운로드 전에도 동작."""
         cols = self.state.columns()
-        self.include_list.clear()
-        for c in cols:
-            it = QListWidgetItem(c)
-            it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
-            it.setCheckState(Qt.Checked)   # 기본: 전체 포함
-            self.include_list.addItem(it)
+        # 3열 체크박스 그리드 재구성
+        while self.include_grid.count():
+            item = self.include_grid.takeAt(0)
+            w = item.widget()
+            if w is not None:
+                w.setParent(None)
+        self.include_checks = []
+        ncols = 3
+        for i, c in enumerate(cols):
+            cb = QCheckBox(c)
+            cb.setChecked(True)   # 기본: 전체 포함
+            self.include_grid.addWidget(cb, i // ncols, i % ncols)
+            self.include_checks.append(cb)
+        for col in range(ncols):
+            self.include_grid.setColumnStretch(col, 1)
 
         self.sort_combo.clear()
         self.sort_combo.addItem("정렬 안 함", "none")
@@ -369,9 +378,8 @@ class ConfigureView(QWidget):
         if not cols:
             return
         # 포함 체크: 제외 목록(drop_columns)에 없으면 체크
-        for i in range(self.include_list.count()):
-            it = self.include_list.item(i)
-            it.setCheckState(Qt.Unchecked if it.text() in preset.drop_columns else Qt.Checked)
+        for cb in self.include_checks:
+            cb.setChecked(cb.text() not in preset.drop_columns)
         # 규칙·필터 재구성
         self._clear_rows(self.rule_rows)
         for rule in preset.rules:
@@ -390,11 +398,7 @@ class ConfigureView(QWidget):
         if self.state.df is None:
             return
         # 체크 안 된 항목 = 리포트에서 제외
-        preset.drop_columns = [
-            self.include_list.item(i).text()
-            for i in range(self.include_list.count())
-            if self.include_list.item(i).checkState() != Qt.Checked
-        ]
+        preset.drop_columns = [cb.text() for cb in self.include_checks if not cb.isChecked()]
         preset.rules = [
             Rule(column=e["col"].currentText(), keyword=e["kw"].text(),
                  match=e["match"].currentData(), priority=e["prio"].currentData(),

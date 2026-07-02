@@ -108,13 +108,23 @@ QPushButton#IconBtn:hover { background: #FBE9EA; color: #E5484D; }
 /* ---------- 스크롤 영역 ---------- */
 QScrollArea { background: transparent; border: none; }
 
+/* ---------- 메일 서식 툴바 ---------- */
+#Toolbar { background: #F4F7FB; border: 1px solid #E2E7EF; border-radius: 8px; }
+QPushButton#ToolBtn {
+    background: #FFFFFF; color: #3A4553; border: 1px solid #CBD6E6; border-radius: 6px;
+    padding: 4px 10px; font-weight: 700;
+}
+QPushButton#ToolBtn:hover { background: #EEF3FB; }
+QPushButton#ToolBtn:checked { background: #2F6FED; color: #FFFFFF; border-color: #2F6FED; }
+
 /* ---------- 체크박스(실행 단계 등) ---------- */
 QCheckBox { spacing: 9px; font-weight: 600; }
 QCheckBox::indicator {
     width: 17px; height: 17px; border: 1px solid #B7C2D2; border-radius: 5px; background: #FFFFFF;
 }
 QCheckBox::indicator:hover { border-color: #2F6FED; }
-QCheckBox::indicator:checked { background: #2F6FED; border-color: #2F6FED; }
+QCheckBox::indicator:checked { background: #2F6FED; border-color: #2F6FED; image: url(@CHECKICON@); }
+QCheckBox::indicator:checked:disabled { background: #9FB4D8; border-color: #9FB4D8; image: url(@CHECKICON@); }
 QCheckBox::indicator:disabled { background: #DCE3EC; border-color: #CAD4E0; }
 QCheckBox:disabled { color: #9AA6B4; }
 

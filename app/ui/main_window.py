@@ -4,8 +4,8 @@
 프로그램 시작 시 자동 복원, [설정 저장]으로 갱신."""
 
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QFrame, QHBoxLayout, QVBoxLayout, QListWidget,
-    QStackedWidget, QLabel, QPushButton, QMessageBox,
+    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QListWidget,
+    QStackedWidget, QLabel, QMessageBox,
 )
 
 from app.ui.state import AppState
@@ -31,11 +31,10 @@ class MainWindow(QMainWindow):
         sb.addWidget(QLabel("KEPCO", objectName="Brand"))
         sb.addWidget(QLabel("점검 리스트 생성기", objectName="BrandSub"))
         self.nav = QListWidget()
-        self.nav.addItems(["①   실행", "②   설정", "③   메일 (베타)"])
+        self.nav.addItems(["①   실행", "②   설정", "③   메일"])
         self.nav.currentRowChanged.connect(self._nav_changed)
         sb.addWidget(self.nav)
         sb.addStretch(1)
-        sb.addWidget(self._config_bar())
 
         # 본문 스택
         self.stack = QStackedWidget()
@@ -56,20 +55,6 @@ class MainWindow(QMainWindow):
         row.addWidget(self.stack, 1)
         self.setCentralWidget(root)
         self.nav.setCurrentRow(0)
-
-    def _config_bar(self) -> QWidget:
-        bar = QFrame(objectName="PresetPanel")
-        v = QVBoxLayout(bar)
-        v.setContentsMargins(16, 14, 16, 16)
-        v.setSpacing(8)
-        v.addWidget(QLabel("설정", objectName="PresetLabel"))
-        hint = QLabel("한 번 저장하면 자동으로 복원됩니다.", objectName="PresetLabel")
-        hint.setWordWrap(True)
-        v.addWidget(hint)
-        btn = QPushButton("설정 저장", objectName="PresetBtn")
-        btn.clicked.connect(self._save_config)
-        v.addWidget(btn)
-        return bar
 
     # ---- 네비게이션 ----
     def _nav_changed(self, row: int):

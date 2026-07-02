@@ -79,7 +79,7 @@ class ExtractView(QWidget):
         c1.setEnabled(False)
         self.chk_process = QCheckBox("2. 설정(정렬·강조·필터) 적용해서 저장")
         self.chk_process.setChecked(True)
-        self.chk_mail = QCheckBox("3. 메일 발송 (베타)")
+        self.chk_mail = QCheckBox("3. 메일 발송")
         for c in (c1, self.chk_process, self.chk_mail):
             sv.addWidget(c)
         sv.addWidget(QLabel(
