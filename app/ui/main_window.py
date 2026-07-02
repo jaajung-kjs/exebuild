@@ -1,7 +1,7 @@
 """메인 윈도우 — 사이드바 네비게이션 + 프리셋 바."""
 
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QListWidget,
+    QMainWindow, QWidget, QFrame, QHBoxLayout, QVBoxLayout, QListWidget,
     QStackedWidget, QLabel, QPushButton, QComboBox, QInputDialog, QMessageBox,
 )
 
@@ -24,9 +24,11 @@ class MainWindow(QMainWindow):
         sidebar = QWidget(objectName="Sidebar")
         sb = QVBoxLayout(sidebar)
         sb.setContentsMargins(0, 0, 0, 0)
-        sb.addWidget(QLabel("KEPCO RPA", objectName="SidebarTitle"))
+        sb.setSpacing(0)
+        sb.addWidget(QLabel("KEPCO", objectName="Brand"))
+        sb.addWidget(QLabel("점검 리스트 생성기", objectName="BrandSub"))
         self.nav = QListWidget()
-        self.nav.addItems(["①  추출", "②  설정", "③  메일"])
+        self.nav.addItems(["①   추출", "②   설정", "③   메일"])
         self.nav.currentRowChanged.connect(self._nav_changed)
         sb.addWidget(self.nav)
         sb.addStretch(1)
@@ -50,17 +52,23 @@ class MainWindow(QMainWindow):
         self.nav.setCurrentRow(0)
 
     def _preset_bar(self) -> QWidget:
-        bar = QWidget()
+        bar = QFrame(objectName="PresetPanel")
         v = QVBoxLayout(bar)
-        v.setContentsMargins(12, 12, 12, 16)
+        v.setContentsMargins(16, 14, 16, 16)
+        v.setSpacing(8)
         self.preset_combo = QComboBox()
         self._reload_presets()
-        load = QPushButton("불러오기", objectName="Ghost")
-        save = QPushButton("현재 설정 저장", objectName="Ghost")
+        load = QPushButton("불러오기", objectName="PresetBtn")
+        save = QPushButton("저장", objectName="PresetBtn")
         load.clicked.connect(self._load_preset)
         save.clicked.connect(self._save_preset)
-        for w in (QLabel("프리셋", objectName="Hint"), self.preset_combo, load, save):
-            v.addWidget(w)
+        v.addWidget(QLabel("프리셋", objectName="PresetLabel"))
+        v.addWidget(self.preset_combo)
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        row.addWidget(load)
+        row.addWidget(save)
+        v.addLayout(row)
         return bar
 
     # ---- 네비게이션 ----

@@ -2,10 +2,10 @@
 
 from datetime import date
 
-from PySide6.QtCore import QDate
+from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QComboBox, QDateEdit, QPushButton,
-    QLabel, QPlainTextEdit,
+    QWidget, QFrame, QVBoxLayout, QHBoxLayout, QFormLayout, QComboBox,
+    QDateEdit, QPushButton, QLabel, QPlainTextEdit,
 )
 
 from app.core import departments
@@ -22,17 +22,28 @@ class ExtractView(QWidget):
         self._offset = 1
 
         v = QVBoxLayout(self)
-        v.setContentsMargins(28, 24, 28, 24)
-        v.addWidget(QLabel("① 데이터 추출", objectName="H1"))
-        v.addWidget(QLabel("날짜와 본부를 선택하고 불러오세요.", objectName="Hint"))
+        v.setContentsMargins(32, 28, 32, 28)
+        v.setSpacing(6)
+        v.addWidget(QLabel("데이터 추출", objectName="H1"))
+        v.addWidget(QLabel("대상 날짜와 본부를 선택해 점검 데이터를 불러옵니다.", objectName="Hint"))
+        v.addSpacing(16)
 
-        form = QFormLayout()
+        # 입력 카드
+        card = QFrame(objectName="Card")
+        card.setMaximumWidth(580)
+        form = QFormLayout(card)
+        form.setContentsMargins(22, 22, 22, 22)
+        form.setSpacing(14)
+        form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+
         self.date_edit = QDateEdit()
         self.date_edit.setCalendarPopup(True)
         self.date_edit.setDisplayFormat("yyyy-MM-dd")
+        self.date_edit.setMinimumHeight(34)
         self._reset_date()
 
         self.dept_combo = QComboBox()
+        self.dept_combo.setMinimumHeight(34)
         for group, deps in departments.grouped().items():
             self.dept_combo.addItem(f"── {group} ──")
             idx = self.dept_combo.count() - 1
@@ -42,14 +53,26 @@ class ExtractView(QWidget):
 
         form.addRow("대상 날짜", self.date_edit)
         form.addRow("본부", self.dept_combo)
-        v.addLayout(form)
+        v.addWidget(card)
 
-        self.btn = QPushButton("불러오기")
+        # 주요 액션 (우측 정렬)
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+        self.btn = QPushButton("불러오기", objectName="Primary")
+        self.btn.setMinimumHeight(38)
         self.btn.clicked.connect(self._start)
-        v.addWidget(self.btn)
+        btn_row.addWidget(self.btn)
+        v.addSpacing(6)
+        v.addLayout(btn_row)
 
+        v.addSpacing(14)
+        v.addWidget(QLabel("진행 상태", objectName="SectionLabel"))
+        v.addSpacing(4)
         self.log = QPlainTextEdit(objectName="StatusLog", readOnly=True)
-        v.addWidget(self.log, 1)
+        self.log.setPlaceholderText("대기 중 — [불러오기]를 누르면 인증·다운로드 진행 상태가 표시됩니다.")
+        self.log.setFixedHeight(200)
+        v.addWidget(self.log)
+        v.addStretch(1)
 
     def _reset_date(self):
         d = resolve_default_date(date.today(), self._offset)

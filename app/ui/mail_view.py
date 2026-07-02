@@ -2,9 +2,10 @@
 
 from datetime import date
 
+from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QFormLayout, QLineEdit, QPlainTextEdit,
-    QPushButton, QLabel, QMessageBox,
+    QWidget, QFrame, QVBoxLayout, QHBoxLayout, QFormLayout, QLineEdit,
+    QPlainTextEdit, QPushButton, QLabel, QMessageBox,
 )
 
 from app.core.mail_config import preset_to_mail_config
@@ -20,32 +21,51 @@ class MailView(QWidget):
         self._worker = None
 
         v = QVBoxLayout(self)
-        v.setContentsMargins(28, 24, 28, 24)
-        v.addWidget(QLabel("③ 메일 전송", objectName="H1"))
-        v.addWidget(QLabel("생성된 엑셀을 첨부해 발송합니다. 제목/본문의 {DATE}는 대상 날짜로 치환됩니다.",
+        v.setContentsMargins(32, 28, 32, 28)
+        v.setSpacing(6)
+        v.addWidget(QLabel("메일 전송", objectName="H1"))
+        v.addWidget(QLabel("생성된 엑셀을 첨부해 발송합니다. 제목·본문의 {DATE}는 대상 날짜로 치환됩니다.",
                            objectName="Hint"))
+        v.addSpacing(16)
 
-        form = QFormLayout()
+        card = QFrame(objectName="Card")
+        form = QFormLayout(card)
+        form.setContentsMargins(22, 22, 22, 22)
+        form.setSpacing(14)
+        form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
         self.from_name = QLineEdit()
+        self.from_name.setMinimumHeight(34)
         self.from_email = QLineEdit()
+        self.from_email.setMinimumHeight(34)
         self.recipients = QPlainTextEdit()
         self.recipients.setPlaceholderText("수신자 이메일 (줄바꿈으로 여러 명)")
-        self.recipients.setFixedHeight(80)
+        self.recipients.setFixedHeight(76)
         self.subject = QLineEdit()
+        self.subject.setMinimumHeight(34)
         self.body = QPlainTextEdit()
+        self.body.setMinimumHeight(150)
         form.addRow("발신자 이름", self.from_name)
         form.addRow("발신자 이메일", self.from_email)
         form.addRow("수신자", self.recipients)
         form.addRow("제목", self.subject)
         form.addRow("본문", self.body)
-        v.addLayout(form)
+        v.addWidget(card)
 
-        self.send_btn = QPushButton("메일 발송")
+        btn_row = QHBoxLayout()
+        btn_row.addStretch(1)
+        self.send_btn = QPushButton("메일 발송", objectName="Primary")
+        self.send_btn.setMinimumHeight(38)
         self.send_btn.clicked.connect(self._send)
-        v.addWidget(self.send_btn)
+        btn_row.addWidget(self.send_btn)
+        v.addSpacing(6)
+        v.addLayout(btn_row)
 
+        v.addSpacing(14)
+        v.addWidget(QLabel("진행 상태", objectName="SectionLabel"))
+        v.addSpacing(4)
         self.log = QPlainTextEdit(objectName="StatusLog", readOnly=True)
-        self.log.setFixedHeight(90)
+        self.log.setPlaceholderText("대기 중 — [메일 발송]을 누르면 전송 진행 상태가 표시됩니다.")
+        self.log.setFixedHeight(96)
         v.addWidget(self.log)
 
     def apply_preset(self, preset):
