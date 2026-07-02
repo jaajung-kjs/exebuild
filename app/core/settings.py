@@ -28,6 +28,7 @@ class Preset:
     sheet_split_column: str = ""        # 지사 시트 분리 기준 열(헤더명)
     rules: list[Rule] = field(default_factory=list)
     filters: list[Filter] = field(default_factory=list)
+    filter_mode: str = "and"            # "and"(모두 만족) | "or"(하나라도 만족)
     sort: str = "none"                  # "none" | "priority" | "<열이름>"
     mail_from_name: str = ""
     mail_from_email: str = ""

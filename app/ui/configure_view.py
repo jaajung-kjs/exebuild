@@ -1,5 +1,8 @@
-"""② 설정 뷰 — 넣을 항목·강조 규칙·필터를 쉬운 문장으로 지정 + 미리보기."""
+"""② 설정 뷰 — 넣을 항목·강조 규칙·필터를 쉬운 문장으로 지정 + 저장."""
 
+import os
+import subprocess
+import sys
 from datetime import date
 
 from PySide6.QtWidgets import (
@@ -23,10 +26,16 @@ MATCH_OPTS = [("포함하면", "contains"), ("정확히 같으면", "equals")]
 PRIORITY_OPTS = [("1순위", 1), ("2순위", 2), ("3순위", 3)]
 FILTER_OPTS = [
     ("비어있지 않은", "not_null"),
+    ("비어있는", "is_empty"),
     ("값을 포함하는", "contains"),
     ("값과 같은", "equals"),
     ("값과 다른", "not_equals"),
+    ("값으로 시작하는", "starts_with"),
+    ("값으로 끝나는", "ends_with"),
+    ("여러 값 중 하나인", "in_list"),
 ]
+MODE_OPTS = [("모두 만족(AND)", "and"), ("하나라도 만족(OR)", "or")]
+NO_VALUE_OPS = {"not_null", "is_empty"}
 _SWATCH_QSS = ("background:{c}; color:#1B2430; border:1px solid rgba(0,0,0,0.18); "
                "border-radius:6px; padding:4px 10px; font-weight:700;")
 
@@ -67,10 +76,14 @@ class ConfigureView(QWidget):
         # 하단 고정 액션
         v.addSpacing(10)
         bottom = QHBoxLayout()
+        self.raw_btn = QPushButton("원본 그대로 저장", objectName="Ghost")
+        self.raw_btn.setMinimumHeight(40)
+        self.raw_btn.clicked.connect(self._save_raw)
+        bottom.addWidget(self.raw_btn)
         bottom.addStretch(1)
-        self.gen_btn = QPushButton("엑셀 만들기", objectName="Primary")
+        self.gen_btn = QPushButton("엑셀 저장", objectName="Primary")
         self.gen_btn.setMinimumHeight(40)
-        self.gen_btn.clicked.connect(self._generate)
+        self.gen_btn.clicked.connect(self._save)
         bottom.addWidget(self.gen_btn)
         v.addLayout(bottom)
 
@@ -123,7 +136,15 @@ class ConfigureView(QWidget):
     def _filters_card(self):
         card, lay = self._card(
             "③ 필요한 행만 추리기 (선택)",
-            "예: ‘지사’가 비어있지 않은 행만 남기기. 조건을 모두 만족하는 행만 남습니다.")
+            "예: ‘지사’가 비어있지 않은 행만 남기기. 조건이 없으면 전체 행이 그대로 유지됩니다.")
+        mode_row = QHBoxLayout()
+        mode_row.setSpacing(8)
+        mode_row.addWidget(QLabel("여러 조건일 때", objectName="Conn"))
+        self.mode_combo = self._mapped_combo(MODE_OPTS, 180)
+        mode_row.addWidget(self.mode_combo)
+        mode_row.addWidget(QLabel("하는 행만 남깁니다.", objectName="Conn"))
+        mode_row.addStretch(1)
+        lay.addLayout(mode_row)
         self.filters_box = QVBoxLayout()
         self.filters_box.setSpacing(8)
         lay.addLayout(self.filters_box)
@@ -269,12 +290,15 @@ class ConfigureView(QWidget):
         self._sync_filter_value(entry)
 
     def _sync_filter_value(self, entry):
-        """‘비어있지 않은’ 조건은 값이 필요 없으므로 값 칸을 비활성화."""
-        needs_value = entry["op"].currentData() != "not_null"
+        """조건에 따라 값 칸을 켜고 끄고, 안내 문구를 바꾼다."""
+        op = entry["op"].currentData()
+        needs_value = op not in NO_VALUE_OPS
         entry["val"].setEnabled(needs_value)
         if not needs_value:
             entry["val"].clear()
             entry["val"].setPlaceholderText("값 필요 없음")
+        elif op == "in_list":
+            entry["val"].setPlaceholderText("여러 값 · 쉼표로 구분 (예: 강릉,원주)")
         else:
             entry["val"].setPlaceholderText("값")
 
@@ -353,6 +377,7 @@ class ConfigureView(QWidget):
         self._clear_rows(self.filter_rows)
         for flt in preset.filters:
             self._add_filter_row(flt)
+        self._set_data(self.mode_combo, preset.filter_mode or "and")
         # 정렬·시트 분리
         self._set_data(self.sort_combo, preset.sort or "none")
         self._set_data(self.split_combo, preset.sheet_split_column or "")
@@ -379,28 +404,73 @@ class ConfigureView(QWidget):
                    value=e["val"].text())
             for e in self.filter_rows
         ]
+        preset.filter_mode = self.mode_combo.currentData() or "and"
         preset.sort = self.sort_combo.currentData() or "none"
         preset.sheet_split_column = self.split_combo.currentData() or ""
 
-    # ---------- 생성 ----------
-    def _generate(self):
+    # ---------- 저장 ----------
+    def _out_path(self, suffix):
+        fmts = date_formats(self.state.target_date or date.today())
+        return str(app_paths.output_dir() / f"{fmts['yymmdd']} 공사현장 점검 {suffix}.xlsx")
+
+    def _save(self):
+        """설정(넣을 항목·강조·필터·정렬)을 적용한 엑셀 저장."""
         if self.state.df is None:
-            QMessageBox.warning(self, "설정", "먼저 데이터를 불러오세요.")
+            QMessageBox.warning(self, "저장", "먼저 데이터를 불러오세요.")
             return
         self.write_into(self.state.preset)
         try:
             processed = process(self.state.df, self.state.preset)
         except ValueError as e:
-            QMessageBox.critical(self, "생성 실패", str(e))
+            QMessageBox.critical(self, "저장 실패", str(e))
             return
-        fmts = date_formats(self.state.target_date or date.today())
-        out = str(app_paths.output_dir() / f"{fmts['yymmdd']} 공사현장 점검 우선순위 리스트.xlsx")
+        out = self._out_path("우선순위 리스트")
+        if self._write(processed, out, self.state.preset.sheet_split_column):
+            self.state.output_path = out
+            self._after_save(out)
+
+    def _save_raw(self):
+        """가공 없이 다운로드한 데이터 그대로 저장."""
+        if self.state.df is None:
+            QMessageBox.warning(self, "원본 저장", "먼저 데이터를 불러오세요.")
+            return
+        out = self._out_path("원본")
+        if self._write(self.state.df, out, ""):
+            self.state.output_path = out
+            self._after_save(out)
+
+    def _write(self, df, out, split) -> bool:
         try:
-            write_excel(processed, out, self.state.preset.sheet_split_column)
+            write_excel(df, out, split)
+            return True
         except (PermissionError, OSError) as e:
             QMessageBox.critical(self, "저장 실패",
                                  f"파일 저장에 실패했습니다.\n파일이 열려 있으면 닫고 다시 시도하세요.\n{e}")
-            return
-        self.state.output_path = out
-        QMessageBox.information(self, "생성 완료", f"저장됨:\n{out}")
-        self.main.goto(2)
+            return False
+
+    def _after_save(self, path):
+        box = QMessageBox(self)
+        box.setWindowTitle("저장 완료")
+        box.setText(f"엑셀을 저장했습니다.\n{path}")
+        open_btn = box.addButton("폴더 열기", QMessageBox.ActionRole)
+        mail_btn = box.addButton("메일로 보내기 (베타)", QMessageBox.ActionRole)
+        box.addButton("닫기", QMessageBox.RejectRole)
+        box.exec()
+        clicked = box.clickedButton()
+        if clicked == open_btn:
+            self._open_folder(path)
+        elif clicked == mail_btn:
+            self.main.goto(2)
+
+    @staticmethod
+    def _open_folder(path):
+        folder = os.path.dirname(path)
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(folder)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", folder])
+            else:
+                subprocess.Popen(["xdg-open", folder])
+        except Exception:
+            pass

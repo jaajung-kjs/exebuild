@@ -75,6 +75,14 @@ def test_sort_by_priority_reorders_shuffled_input():
     assert list(out["지사"]) == ["강릉", "원주", "속초"]
 
 
+def test_process_without_rules_adds_no_priority_column():
+    preset = Preset(name="t", department_code="4200")   # 규칙 없음
+    out = process(_df(), preset)
+    assert "점검순위" not in out.columns
+    assert "_row_color" not in out.columns
+    assert len(out) == 3
+
+
 def test_process_applies_filter_priority_drop_sort():
     preset = Preset(
         name="t", department_code="4200",

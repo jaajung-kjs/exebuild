@@ -1,5 +1,7 @@
 """규칙 엔진 — 원본 DataFrame + Preset → 가공된 DataFrame (순수 함수)"""
 
+import re
+
 import pandas as pd
 
 from app.core.settings import Preset, Rule, Filter
@@ -7,25 +9,45 @@ from app.core.settings import Preset, Rule, Filter
 PRIORITY_LABELS = {1: "1순위", 2: "2순위", 3: "3순위"}
 
 
-def apply_filters(df: pd.DataFrame, filters: list[Filter]) -> pd.DataFrame:
-    """필터를 AND로 결합해 행을 선별. 존재하지 않는 열 필터는 무시."""
-    result = df
+def _filter_mask(col: pd.Series, op: str, value: str):
+    """단일 필터 조건의 불리언 마스크. 지원하지 않는 op이면 None."""
+    s = col.astype(str)
+    if op == "not_null":
+        return col.notna() & (s.str.strip() != "")
+    if op == "is_empty":
+        return col.isna() | (s.str.strip() == "")
+    if op == "equals":
+        return s == value
+    if op == "not_equals":
+        return s != value
+    if op == "contains":
+        return s.str.contains(value, regex=False, na=False)
+    if op == "starts_with":
+        return s.str.startswith(value, na=False)
+    if op == "ends_with":
+        return s.str.endswith(value, na=False)
+    if op == "in_list":
+        vals = [v.strip() for v in re.split(r"[,\n]", value) if v.strip()]
+        return s.isin(vals)
+    return None
+
+
+def apply_filters(df: pd.DataFrame, filters: list[Filter], mode: str = "and") -> pd.DataFrame:
+    """필터로 행을 선별. mode='and'(모두 만족) 또는 'or'(하나라도 만족).
+    존재하지 않는 열·지원하지 않는 조건은 무시."""
+    masks = []
     for f in filters:
-        if f.column not in result.columns:
+        if f.column not in df.columns:
             continue
-        col = result[f.column]
-        if f.op == "not_null":
-            mask = col.notna() & (col.astype(str).str.strip() != "")
-        elif f.op == "equals":
-            mask = col.astype(str) == f.value
-        elif f.op == "not_equals":
-            mask = col.astype(str) != f.value
-        elif f.op == "contains":
-            mask = col.astype(str).str.contains(f.value, regex=False, na=False)
-        else:
-            continue
-        result = result[mask]
-    return result
+        m = _filter_mask(df[f.column], f.op, f.value)
+        if m is not None:
+            masks.append(m)
+    if not masks:
+        return df
+    combined = masks[0]
+    for m in masks[1:]:
+        combined = (combined | m) if mode == "or" else (combined & m)
+    return df[combined]
 
 
 def apply_drop(df: pd.DataFrame, drop_columns: list[str]) -> pd.DataFrame:
@@ -66,6 +88,8 @@ def sort_df(df: pd.DataFrame, sort: str) -> pd.DataFrame:
     if sort == "none" or not sort:
         return df
     if sort == "priority":
+        if "점검순위" not in df.columns:
+            return df
         order = {"1순위": 0, "2순위": 1, "3순위": 2}
         key = df["점검순위"].map(order).fillna(9)
         return df.assign(_ord=key).sort_values("_ord", kind="stable").drop(columns="_ord")
@@ -80,8 +104,9 @@ def process(df: pd.DataFrame, preset: Preset) -> pd.DataFrame:
     dups = df.columns[df.columns.duplicated()].unique().tolist()
     if dups:
         raise ValueError(f"중복된 열 이름이 있어 처리할 수 없습니다: {dups}")
-    out = apply_filters(df, preset.filters)
-    out = assign_priority(out, preset.rules)
+    out = apply_filters(df, preset.filters, preset.filter_mode)
+    if preset.rules:                       # 규칙이 있을 때만 '점검순위' 열 추가·색칠
+        out = assign_priority(out, preset.rules)
     out = apply_drop(out, preset.drop_columns)
     out = sort_df(out, preset.sort)
     return out.reset_index(drop=True)

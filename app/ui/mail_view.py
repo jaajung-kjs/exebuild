@@ -23,8 +23,8 @@ class MailView(QWidget):
         v = QVBoxLayout(self)
         v.setContentsMargins(32, 28, 32, 28)
         v.setSpacing(6)
-        v.addWidget(QLabel("메일 전송", objectName="H1"))
-        v.addWidget(QLabel("생성된 엑셀을 첨부해 발송합니다. 제목·본문의 {DATE}는 대상 날짜로 치환됩니다.",
+        v.addWidget(QLabel("메일 전송 (베타)", objectName="H1"))
+        v.addWidget(QLabel("선택 기능입니다. 저장한 엑셀을 첨부해 발송합니다. 제목·본문의 {DATE}는 대상 날짜로 치환됩니다.",
                            objectName="Hint"))
         v.addSpacing(16)
 
