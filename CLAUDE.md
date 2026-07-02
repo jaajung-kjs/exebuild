@@ -35,9 +35,9 @@ main.py (orchestrator)
   ├── read_department_code()   ← 분류표.xlsx M2 (비어있으면 "4200")
   │
   ├── [1/3] 인증 + 다운로드 (재시도 루프, 최대 10회)
-  │     ├── auth.authenticate()                    ← PowerGate WSS + GET 검증 (자체 재시도)
+  │     ├── auth.authenticate()                    ← PowerGate WSS 쿠키 획득 (재시도 없음, 실패 시 None)
   │     └── downloader.download_excel_to_dataframe() ← Work Monitor HTTP (열 ≤1이면 실패)
-  │         └── 다운로드 실패 시 → 재인증부터 다시 시도
+  │         └── 인증 또는 다운로드 실패 시 → main.py 루프가 재인증부터 다시 시도
   │
   ├── [2/3] 데이터 가공
   │     ├── processor.load_classification_and_mail_config()
@@ -50,7 +50,7 @@ main.py (orchestrator)
 ### Module Responsibilities
 
 - **main.py** - Orchestrator. Reads target date (N2) and department code (M2) from `분류표.xlsx`. Runs 3-step pipeline with auth+download retry loop.
-- **auth.py** - Connects to local PowerGate via WebSocket (`ws://127.0.0.1:21777`), extracts SSO cookies (`pgsecuid`, `pgsecuid2`, `opv`), creates `requests.Session`, then validates via Work Monitor GET request. Retries up to 10 times with 2-second delay on validation failure.
+- **auth.py** - Connects to local PowerGate via WebSocket (`ws://127.0.0.1:21777`), extracts SSO cookies (`pgsecuid`, `pgsecuid2`, `opv`), and creates a `requests.Session`. A single attempt — no session validation, no internal retry; returns `None` on WebSocket failure or malformed response. The auth+download retry loop lives entirely in `main.py`.
 - **downloader.py** - POSTs to Work Monitor's `/WORK/DAYWORK/excel_extract.php`. Auto-detects HTML vs Excel response format. Validates DataFrame column count (≤1 column = server error). Returns a `pandas.DataFrame`.
 - **processor.py** - Core business logic. Loads classification keywords and mail config from `분류표.xlsx`. Determines priority (1순위/2순위/3순위) per row based on category type and keyword matching. Generates formatted multi-sheet Excel (one sheet per D-column unique value). Accepts `target_date_yymmdd` parameter for filename.
 - **mailer.py** - Uploads attachment, validates recipients, sends via BizMail REST API. Uses list-of-tuples (not dict) for form data to support multiple recipients with the same `'to'` key. Accepts `date_yymmdd`, `date_yy_mm_dd` parameters for subject/body.
@@ -60,8 +60,10 @@ main.py (orchestrator)
 
 Two failure modes are handled:
 
-1. **SSO 미완료** (PowerGate 초기화 타이밍): `auth.py`가 Work Monitor GET 요청으로 세션 검증, 실패 시 자체 재시도 (최대 10회)
+1. **SSO 미완료 / 인증 실패** (PowerGate 초기화 타이밍): `auth.authenticate()`가 쿠키 획득 실패 시 `None` 반환. 검증·재시도는 `auth.py` 안에 없고, `main.py` 루프가 재인증부터 다시 시도 (최대 10회, 3초 간격)
 2. **서버 일시 오류** (Work Monitor 내부 오류): `downloader.py`가 DataFrame 열 개수 검증 (≤1이면 None 반환), `main.py`가 재인증부터 다시 시도 (최대 10회)
+
+> 참고: `main.py`의 재시도 루프는 `MAX_RETRIES=10`, `RETRY_DELAY=3`초로, 인증·다운로드를 한 단위로 묶어 재시도한다. 세션 검증 목적의 별도 GET 요청은 존재하지 않는다.
 
 ### Critical Data File: 분류표.xlsx
 
