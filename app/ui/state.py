@@ -9,6 +9,7 @@ class AppState:
         self.session = None       # 인증 세션 (메일 발송에 재사용)
         self.preset = Preset(name="새 프리셋", department_code="")
         self.output_path = None   # 생성된 엑셀 경로
+        self.target_date = None   # 추출에서 선택한 대상 날짜 (date)
 
     def columns(self) -> list:
         if self.df is None:

@@ -75,6 +75,8 @@ class ExtractView(QWidget):
             return
         qd = self.date_edit.date()
         date_from = f"{qd.year():04d}-{qd.month():02d}-{qd.day():02d}"
+        from datetime import date as _date
+        self.state.target_date = _date(qd.year(), qd.month(), qd.day())
         self.state.preset.department_code = code
         self.btn.setEnabled(False)
         self.log.clear()

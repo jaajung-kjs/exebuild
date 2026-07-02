@@ -219,7 +219,7 @@ class ConfigureView(QWidget):
         except ValueError as e:
             QMessageBox.critical(self, "생성 실패", str(e))
             return
-        fmts = date_formats(date.today())
+        fmts = date_formats(self.state.target_date or date.today())
         out = str(app_paths.output_dir() / f"{fmts['yymmdd']} 공사현장 점검 우선순위 리스트.xlsx")
         try:
             write_excel(processed, out, self.state.preset.sheet_split_column)
