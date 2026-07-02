@@ -32,6 +32,7 @@ class ExtractView(QWidget):
         self._mail_worker = None
         self._do_process = True
         self._do_mail = False
+        self._loading = True   # 초기/프리셋 적용 중엔 자동 저장 안 함
 
         v = QVBoxLayout(self)
         v.setContentsMargins(32, 28, 32, 28)
@@ -55,10 +56,12 @@ class ExtractView(QWidget):
         self.date_mode.addItem("내일", "tomorrow")
         self.date_mode.addItem("특정 날짜", "fixed")
         self.date_mode.currentIndexChanged.connect(self._on_date_mode)
+        self.date_mode.currentIndexChanged.connect(self._on_target_changed)
         self.date_edit = QDateEdit()
         self.date_edit.setCalendarPopup(True)
         self.date_edit.setDisplayFormat("yyyy-MM-dd")
         self.date_edit.setMinimumHeight(34)
+        self.date_edit.dateChanged.connect(self._on_target_changed)
         date_row = QHBoxLayout()
         date_row.setSpacing(8)
         date_row.addWidget(self.date_mode)
@@ -72,6 +75,7 @@ class ExtractView(QWidget):
             self.dept_combo.model().item(idx).setEnabled(False)
             for d in deps:
                 self.dept_combo.addItem(d.name, d.code)
+        self.dept_combo.currentIndexChanged.connect(self._on_target_changed)
         form.addRow("대상 날짜", date_row)
         form.addRow("본부", self.dept_combo)
         v.addWidget(card)
@@ -139,8 +143,16 @@ class ExtractView(QWidget):
         qd = self.date_edit.date()
         return date(qd.year(), qd.month(), qd.day())
 
+    def _on_target_changed(self, *args):
+        """본부·날짜가 바뀌면 즉시 자동 저장(레지스트리). 초기/적용 중엔 무시."""
+        if self._loading:
+            return
+        self.write_into(self.state.preset)
+        self.main.persist_config()
+
     # ---- 프리셋 연동 ----
     def apply_preset(self, preset):
+        self._loading = True
         mode = getattr(preset, "date_mode", None) or (
             "tomorrow" if getattr(preset, "default_date_offset", 1) else "today")
         i = self.date_mode.findData(mode)
@@ -156,6 +168,7 @@ class ExtractView(QWidget):
         i = self.dept_combo.findData(preset.department_code)
         if i >= 0:
             self.dept_combo.setCurrentIndex(i)
+        self._loading = False
 
     def write_into(self, preset):
         preset.department_code = self.dept_combo.currentData() or ""

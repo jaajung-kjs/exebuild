@@ -71,6 +71,10 @@ class MainWindow(QMainWindow):
         QMessageBox.information(self, "설정 저장",
                                 "설정을 저장했습니다.\n다음 실행부터 자동으로 적용됩니다.")
 
+    def persist_config(self):
+        """현재 state.preset을 조용히(안내창 없이) 저장. ①실행의 본부·날짜 자동 저장용."""
+        config_store.save_config(self.state.preset)
+
     def apply_preset(self, preset):
         self.extract.apply_preset(preset)
         self.configure.apply_preset(preset)
