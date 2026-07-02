@@ -1,16 +1,26 @@
-"""① 실행 뷰 — 날짜·본부 선택 후 원하는 단계만 골라 한 번에 실행."""
+"""① 실행 뷰 — 날짜·본부 선택 후 원하는 단계만 골라 한 번에 실행.
 
+프로그램의 유일한 실행 진입점. 다운로드·저장·메일 발송이 모두 여기서 일어난다.
+(②설정·③메일 탭은 설정 편집·저장만 담당)"""
+
+import os
+import subprocess
+import sys
 from datetime import date
 
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
     QWidget, QFrame, QVBoxLayout, QHBoxLayout, QFormLayout, QComboBox,
-    QDateEdit, QPushButton, QLabel, QPlainTextEdit, QCheckBox,
+    QDateEdit, QPushButton, QLabel, QPlainTextEdit, QCheckBox, QMessageBox,
 )
 
 from app.core import departments
-from app.core.date_util import resolve_default_date
-from app.ui.workers import DownloadWorker
+from app.core.engine import process
+from app.core.excel_writer import write_excel
+from app.core.mail_config import preset_to_mail_config
+from app.core.date_util import resolve_default_date, date_formats
+from app import app_paths
+from app.ui.workers import DownloadWorker, MailWorker
 
 
 class ExtractView(QWidget):
@@ -19,6 +29,7 @@ class ExtractView(QWidget):
         self.state = state
         self.main = main
         self._worker = None
+        self._mail_worker = None
         self._offset = 1
         self._do_process = True
         self._do_mail = False
@@ -141,18 +152,19 @@ class ExtractView(QWidget):
         self.state.df = df
         self.btn.setEnabled(True)
         self._append(f"✅ 불러오기 완료: {len(df)}행 × {len(df.columns)}열")
-        cfg = self.main.configure
-        cfg.load_dataframe()   # 컬럼·미리보기 채우고 프리셋 설정 반영
+        self.main.configure.load_dataframe()   # ②탭 미리보기·설정 위젯 채움
 
         if not self._do_process:
             self._append("원본 그대로 저장합니다…")
-            self._finish(cfg.save_raw())
+            self._finish(self._save_raw())
             return
         if self._has_config():
+            self.main.configure.write_into(self.state.preset)   # 최신 설정 반영
             self._append("설정을 적용해 저장합니다…")
-            self._finish(cfg.save_processed())
+            self._finish(self._save_processed())
         else:
-            self._append("적용할 설정이 없습니다 → 설정 화면에서 규칙을 정하고 저장하세요.")
+            self._append("적용할 설정이 없습니다 → ②설정 탭에서 규칙을 만들고 "
+                         "[설정 저장] 후 다시 실행하세요.")
             self.main.goto(1)
 
     def _has_config(self):
@@ -160,17 +172,99 @@ class ExtractView(QWidget):
         return bool(p.rules or p.filters or p.drop_columns or p.sheet_split_column
                     or (p.sort and p.sort != "none"))
 
+    # ---- 저장 실행 ----
+    def _out_path(self, suffix):
+        fmts = date_formats(self.state.target_date or date.today())
+        return str(app_paths.output_dir() / f"{fmts['yymmdd']} 공사현장 점검 {suffix}.xlsx")
+
+    def _write(self, df, out, split):
+        try:
+            write_excel(df, out, split)
+            return True
+        except (PermissionError, OSError) as e:
+            self._append(f"❌ 저장 실패: {e}")
+            QMessageBox.critical(self, "저장 실패",
+                                 f"파일 저장에 실패했습니다.\n파일이 열려 있으면 닫고 다시 시도하세요.\n{e}")
+            return False
+
+    def _save_processed(self):
+        try:
+            processed = process(self.state.df, self.state.preset)
+        except ValueError as e:
+            self._append("❌ " + str(e))
+            QMessageBox.critical(self, "저장 실패", str(e))
+            return None
+        out = self._out_path("우선순위 리스트")
+        if self._write(processed, out, self.state.preset.sheet_split_column):
+            self.state.output_path = out
+            return out
+        return None
+
+    def _save_raw(self):
+        out = self._out_path("원본")
+        if self._write(self.state.df, out, ""):
+            self.state.output_path = out
+            return out
+        return None
+
     def _finish(self, out):
         if not out:
-            self._append("❌ 저장에 실패했습니다.")
             return
         self._append(f"✅ 저장 완료: {out}")
         if self._do_mail:
-            self._append("메일 화면으로 이동합니다.")
-            self.main.mail.apply_preset(self.state.preset)
-            self.main.goto(2)
+            self._send_mail(out)
         else:
-            self.main.configure._after_save(out)
+            self._after_save(out)
+
+    # ---- 메일 실행 (③ 체크 시) ----
+    def _send_mail(self, attachment):
+        self.main.mail.write_into(self.state.preset)   # ③탭 입력값 반영
+        mc = preset_to_mail_config(self.state.preset)
+        if not mc.get("recipients"):
+            self._append("⚠️ 메일 수신자가 없어 발송을 건너뜁니다. (③메일 탭에서 설정 후 저장)")
+            self._after_save(attachment)
+            return
+        self._append("메일 발송 중…")
+        fmts = date_formats(self.state.target_date or date.today())
+        self._mail_worker = MailWorker(self.state.session, mc, attachment,
+                                       fmts["yymmdd"], fmts["yy_mm_dd"])
+        self._mail_worker.status.connect(self._append)
+        self._mail_worker.done.connect(self._on_mail_done)
+        self._mail_worker.failed.connect(lambda m: self._append("❌ " + m))
+        self._mail_worker.start()
+
+    def _on_mail_done(self, result):
+        if result.get("success"):
+            self._append("✅ 메일 발송 완료")
+            QMessageBox.information(self, "완료", "저장 및 메일 발송이 완료되었습니다.")
+        else:
+            msg = result.get("message", "")
+            self._append("❌ 메일 발송 실패: " + msg)
+            QMessageBox.warning(self, "메일 실패",
+                                f"메일 발송 실패: {msg}\n엑셀은 저장되어 있습니다.")
+
+    def _after_save(self, path):
+        box = QMessageBox(self)
+        box.setWindowTitle("저장 완료")
+        box.setText(f"엑셀을 저장했습니다.\n{path}")
+        open_btn = box.addButton("폴더 열기", QMessageBox.ActionRole)
+        box.addButton("닫기", QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() == open_btn:
+            self._open_folder(path)
+
+    @staticmethod
+    def _open_folder(path):
+        folder = os.path.dirname(path)
+        try:
+            if sys.platform.startswith("win"):
+                os.startfile(folder)  # type: ignore[attr-defined]
+            elif sys.platform == "darwin":
+                subprocess.Popen(["open", folder])
+            else:
+                subprocess.Popen(["xdg-open", folder])
+        except Exception:
+            pass
 
     def _on_failed(self, msg):
         self._append("❌ " + msg)

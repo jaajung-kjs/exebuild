@@ -1,23 +1,16 @@
-"""② 설정 뷰 — 넣을 항목·강조 규칙·필터를 쉬운 문장으로 지정 + 저장."""
+"""② 설정 뷰 — 넣을 항목·강조 규칙·필터를 쉬운 문장으로 편집·저장.
 
-import os
-import subprocess
-import sys
-from datetime import date
+설정(프리셋) 편집 전용. 실제 실행(다운로드·저장·메일)은 ①실행 화면에서만 한다."""
 
 from PySide6.QtWidgets import (
     QWidget, QFrame, QScrollArea, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
     QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem, QComboBox,
-    QLineEdit, QColorDialog, QMessageBox,
+    QLineEdit, QColorDialog,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
-from app.core.engine import process
-from app.core.excel_writer import write_excel
 from app.core.settings import Rule, Filter
-from app.core.date_util import date_formats
-from app import app_paths
 
 PREVIEW_ROWS = 20
 
@@ -73,18 +66,16 @@ class ConfigureView(QWidget):
         scroll.setWidget(body)
         v.addWidget(scroll, 1)
 
-        # 하단 고정 액션
+        # 하단 고정 액션 — 설정(프리셋) 저장만. 실행은 ①실행 화면에서.
         v.addSpacing(10)
         bottom = QHBoxLayout()
-        self.raw_btn = QPushButton("원본 그대로 저장", objectName="Ghost")
-        self.raw_btn.setMinimumHeight(40)
-        self.raw_btn.clicked.connect(self._save_raw)
-        bottom.addWidget(self.raw_btn)
+        bottom.addWidget(QLabel("다운로드·저장·메일 실행은 ①실행 화면에서 합니다.",
+                                objectName="Hint"))
         bottom.addStretch(1)
-        self.gen_btn = QPushButton("엑셀 저장", objectName="Primary")
-        self.gen_btn.setMinimumHeight(40)
-        self.gen_btn.clicked.connect(self._save)
-        bottom.addWidget(self.gen_btn)
+        self.save_btn = QPushButton("설정 저장", objectName="Primary")
+        self.save_btn.setMinimumHeight(40)
+        self.save_btn.clicked.connect(lambda: self.main._save_preset())
+        bottom.addWidget(self.save_btn)
         v.addLayout(bottom)
 
     # ---------- 카드 뼈대 ----------
@@ -408,85 +399,3 @@ class ConfigureView(QWidget):
         preset.sort = self.sort_combo.currentData() or "none"
         preset.sheet_split_column = self.split_combo.currentData() or ""
 
-    # ---------- 저장 ----------
-    def _out_path(self, suffix):
-        fmts = date_formats(self.state.target_date or date.today())
-        return str(app_paths.output_dir() / f"{fmts['yymmdd']} 공사현장 점검 {suffix}.xlsx")
-
-    def save_processed(self) -> str | None:
-        """설정을 적용해 저장. 성공 시 경로, 실패 시 None. (안내창 없음 — 실행 흐름에서 재사용)"""
-        if self.state.df is None:
-            return None
-        self.write_into(self.state.preset)
-        try:
-            processed = process(self.state.df, self.state.preset)
-        except ValueError as e:
-            QMessageBox.critical(self, "저장 실패", str(e))
-            return None
-        out = self._out_path("우선순위 리스트")
-        if self._write(processed, out, self.state.preset.sheet_split_column):
-            self.state.output_path = out
-            return out
-        return None
-
-    def save_raw(self) -> str | None:
-        """가공 없이 원본 저장. 성공 시 경로, 실패 시 None."""
-        if self.state.df is None:
-            return None
-        out = self._out_path("원본")
-        if self._write(self.state.df, out, ""):
-            self.state.output_path = out
-            return out
-        return None
-
-    def _save(self):
-        if self.state.df is None:
-            QMessageBox.warning(self, "저장", "먼저 데이터를 불러오세요.")
-            return
-        out = self.save_processed()
-        if out:
-            self._after_save(out)
-
-    def _save_raw(self):
-        if self.state.df is None:
-            QMessageBox.warning(self, "원본 저장", "먼저 데이터를 불러오세요.")
-            return
-        out = self.save_raw()
-        if out:
-            self._after_save(out)
-
-    def _write(self, df, out, split) -> bool:
-        try:
-            write_excel(df, out, split)
-            return True
-        except (PermissionError, OSError) as e:
-            QMessageBox.critical(self, "저장 실패",
-                                 f"파일 저장에 실패했습니다.\n파일이 열려 있으면 닫고 다시 시도하세요.\n{e}")
-            return False
-
-    def _after_save(self, path):
-        box = QMessageBox(self)
-        box.setWindowTitle("저장 완료")
-        box.setText(f"엑셀을 저장했습니다.\n{path}")
-        open_btn = box.addButton("폴더 열기", QMessageBox.ActionRole)
-        mail_btn = box.addButton("메일로 보내기 (베타)", QMessageBox.ActionRole)
-        box.addButton("닫기", QMessageBox.RejectRole)
-        box.exec()
-        clicked = box.clickedButton()
-        if clicked == open_btn:
-            self._open_folder(path)
-        elif clicked == mail_btn:
-            self.main.goto(2)
-
-    @staticmethod
-    def _open_folder(path):
-        folder = os.path.dirname(path)
-        try:
-            if sys.platform.startswith("win"):
-                os.startfile(folder)  # type: ignore[attr-defined]
-            elif sys.platform == "darwin":
-                subprocess.Popen(["open", folder])
-            else:
-                subprocess.Popen(["xdg-open", folder])
-        except Exception:
-            pass
