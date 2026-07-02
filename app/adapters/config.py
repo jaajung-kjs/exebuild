@@ -5,6 +5,7 @@ Handles path management for both development and exe packaging
 
 import os
 import sys
+from pathlib import Path
 
 
 def get_base_dir():
@@ -16,8 +17,8 @@ def get_base_dir():
         # Running as compiled exe
         return os.path.dirname(sys.executable)
     else:
-        # Running as Python script
-        return os.path.dirname(os.path.abspath(__file__))
+        # Running as Python script — 저장소 루트 (app/adapters/config.py 기준 2단계 상위)
+        return str(Path(__file__).resolve().parents[2])
 
 
 def get_output_dir():
