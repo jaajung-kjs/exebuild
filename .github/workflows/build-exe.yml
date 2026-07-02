@@ -40,7 +40,6 @@ jobs:
         name: KEPCO_RPA_Windows
         path: |
           dist/KEPCO_RPA.exe
-          분류표.xlsx
         retention-days: 90
 
     - name: Create Release (on tag)
@@ -49,7 +48,6 @@ jobs:
       with:
         files: |
           dist/KEPCO_RPA.exe
-          분류표.xlsx
           README.md
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
