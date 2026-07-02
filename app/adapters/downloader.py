@@ -15,6 +15,12 @@ from app.adapters.config import (
 MIN_VALID_COLUMNS = 2
 
 
+def is_valid_schema(df, min_columns: int = MIN_VALID_COLUMNS) -> bool:
+    """다운로드된 DataFrame이 유효한 스키마인지 판정.
+    열 개수가 부족하면(서버 오류 응답 등) False → 호출부가 재시도."""
+    return len(df.columns) >= min_columns
+
+
 def download_excel_to_dataframe(session, date_from=None, date_to=None, department_code=None):
     """
     Download Excel from Work Monitor and return as DataFrame
@@ -132,7 +138,7 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None, departmen
                 df = pd.read_excel(content, engine='xlrd')
 
             # Validate: server error returns 1-column DataFrame with error message
-            if len(df.columns) < MIN_VALID_COLUMNS:
+            if not is_valid_schema(df):
                 first_value = str(df.iloc[0, 0]) if len(df) > 0 else ''
                 print(f"[실패] 서버 오류 응답 (열 {len(df.columns)}개)")
                 print(f"        내용: {first_value[:100]}")
