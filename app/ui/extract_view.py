@@ -6,7 +6,7 @@
 import os
 import subprocess
 import sys
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
@@ -18,7 +18,7 @@ from app.core import departments
 from app.core.engine import process
 from app.core.excel_writer import write_excel
 from app.core.mail_config import preset_to_mail_config
-from app.core.date_util import resolve_default_date, date_formats
+from app.core.date_util import date_formats
 from app import app_paths
 from app.ui.workers import DownloadWorker, MailWorker
 
@@ -30,7 +30,6 @@ class ExtractView(QWidget):
         self.main = main
         self._worker = None
         self._mail_worker = None
-        self._offset = 1
         self._do_process = True
         self._do_mail = False
 
@@ -49,11 +48,22 @@ class ExtractView(QWidget):
         form.setContentsMargins(22, 20, 22, 20)
         form.setSpacing(14)
         form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
+        # 대상 날짜 = 모드(오늘/내일/특정) + 날짜 선택기
+        self.date_mode = QComboBox()
+        self.date_mode.setMinimumHeight(34)
+        self.date_mode.addItem("오늘", "today")
+        self.date_mode.addItem("내일", "tomorrow")
+        self.date_mode.addItem("특정 날짜", "fixed")
+        self.date_mode.currentIndexChanged.connect(self._on_date_mode)
         self.date_edit = QDateEdit()
         self.date_edit.setCalendarPopup(True)
         self.date_edit.setDisplayFormat("yyyy-MM-dd")
         self.date_edit.setMinimumHeight(34)
-        self._reset_date()
+        date_row = QHBoxLayout()
+        date_row.setSpacing(8)
+        date_row.addWidget(self.date_mode)
+        date_row.addWidget(self.date_edit, 1)
+
         self.dept_combo = QComboBox()
         self.dept_combo.setMinimumHeight(34)
         for group, deps in departments.grouped().items():
@@ -62,9 +72,11 @@ class ExtractView(QWidget):
             self.dept_combo.model().item(idx).setEnabled(False)
             for d in deps:
                 self.dept_combo.addItem(d.name, d.code)
-        form.addRow("대상 날짜", self.date_edit)
+        form.addRow("대상 날짜", date_row)
         form.addRow("본부", self.dept_combo)
         v.addWidget(card)
+        self.date_mode.setCurrentIndex(1)   # 기본: 내일
+        self._on_date_mode()
 
         # 실행할 작업 카드
         steps = QFrame(objectName="Card")
@@ -108,21 +120,51 @@ class ExtractView(QWidget):
         v.addWidget(self.log)
         v.addStretch(1)
 
-    def _reset_date(self):
-        d = resolve_default_date(date.today(), self._offset)
-        self.date_edit.setDate(QDate(d.year, d.month, d.day))
+    def _on_date_mode(self):
+        """모드에 따라 날짜 선택기를 활성/비활성하고 오늘·내일이면 날짜를 맞춘다."""
+        mode = self.date_mode.currentData()
+        if mode == "fixed":
+            self.date_edit.setEnabled(True)
+        else:
+            self.date_edit.setEnabled(False)
+            d = date.today() if mode == "today" else date.today() + timedelta(days=1)
+            self.date_edit.setDate(QDate(d.year, d.month, d.day))
+
+    def _target_date(self) -> date:
+        mode = self.date_mode.currentData()
+        if mode == "today":
+            return date.today()
+        if mode == "tomorrow":
+            return date.today() + timedelta(days=1)
+        qd = self.date_edit.date()
+        return date(qd.year(), qd.month(), qd.day())
 
     # ---- 프리셋 연동 ----
     def apply_preset(self, preset):
-        self._offset = preset.default_date_offset
-        self._reset_date()
+        mode = getattr(preset, "date_mode", None) or (
+            "tomorrow" if getattr(preset, "default_date_offset", 1) else "today")
+        i = self.date_mode.findData(mode)
+        if i >= 0:
+            self.date_mode.setCurrentIndex(i)
+        self._on_date_mode()
+        if mode == "fixed" and getattr(preset, "fixed_date", ""):
+            try:
+                d = datetime.strptime(preset.fixed_date, "%Y-%m-%d").date()
+                self.date_edit.setDate(QDate(d.year, d.month, d.day))
+            except ValueError:
+                pass
         i = self.dept_combo.findData(preset.department_code)
         if i >= 0:
             self.dept_combo.setCurrentIndex(i)
 
     def write_into(self, preset):
         preset.department_code = self.dept_combo.currentData() or ""
-        preset.default_date_offset = self._offset
+        mode = self.date_mode.currentData()
+        preset.date_mode = mode
+        if mode == "fixed":
+            d = self._target_date()
+            preset.fixed_date = d.strftime("%Y-%m-%d")
+        preset.default_date_offset = 0 if mode == "today" else 1
 
     # ---- 실행 ----
     def _run(self):
@@ -130,9 +172,9 @@ class ExtractView(QWidget):
         if not code:
             self._append("본부를 선택하세요.")
             return
-        qd = self.date_edit.date()
-        date_from = f"{qd.year():04d}-{qd.month():02d}-{qd.day():02d}"
-        self.state.target_date = date(qd.year(), qd.month(), qd.day())
+        d = self._target_date()
+        date_from = d.strftime("%Y-%m-%d")
+        self.state.target_date = d
         self.state.preset.department_code = code
         self._do_process = self.chk_process.isChecked()
         self._do_mail = self.chk_mail.isChecked()
