@@ -6,7 +6,7 @@ Handles WebSocket communication for SSO authentication
 import asyncio
 import websockets
 import requests
-from config import POWERGATE_WS_URI, WEBSOCKET_TIMEOUT
+from app.adapters.config import POWERGATE_WS_URI, WEBSOCKET_TIMEOUT
 
 
 async def get_powergate_cookies():

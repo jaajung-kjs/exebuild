@@ -7,7 +7,7 @@ import requests
 import os
 from datetime import datetime, timedelta
 import uuid
-from config import BIZMAIL_URL, HTTP_TIMEOUT
+from app.adapters.config import BIZMAIL_URL, HTTP_TIMEOUT
 
 
 def generate_temp_key():

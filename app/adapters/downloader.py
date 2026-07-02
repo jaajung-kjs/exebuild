@@ -7,7 +7,7 @@ import requests
 from datetime import datetime, timedelta
 import pandas as pd
 from io import BytesIO
-from config import (
+from app.adapters.config import (
     WORK_MONITOR_URL, HTTP_TIMEOUT,
     PAGE, LIST_COUNT, DEPARTMENT_CODE
 )

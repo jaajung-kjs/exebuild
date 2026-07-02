@@ -20,11 +20,6 @@ def get_base_dir():
         return os.path.dirname(os.path.abspath(__file__))
 
 
-def get_classification_file_path():
-    """Get the path to 분류표.xlsx"""
-    return os.path.join(get_base_dir(), '분류표.xlsx')
-
-
 def get_output_dir():
     """Get the output directory (same as exe location)"""
     output_dir = get_base_dir()
