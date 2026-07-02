@@ -1,0 +1,20 @@
+* { font-family: "Malgun Gothic", "맑은 고딕", sans-serif; font-size: 13px; color: #1f2733; }
+QMainWindow, QWidget { background: #f4f6f9; }
+#Sidebar { background: #1f3a5f; min-width: 176px; max-width: 176px; }
+#Sidebar QListWidget { background: transparent; border: none; color: #cdd7e5; outline: 0; }
+#Sidebar QListWidget::item { padding: 13px 18px; border: none; }
+#Sidebar QListWidget::item:selected { background: #2b4d7a; color: #ffffff; border-left: 3px solid #6ea8fe; }
+#SidebarTitle { color: #ffffff; font-size: 15px; font-weight: 700; padding: 18px; }
+#Card { background: #ffffff; border: 1px solid #e3e8ef; border-radius: 8px; }
+QLabel#H1 { font-size: 18px; font-weight: 700; }
+QLabel#Hint { color: #7a8699; }
+QPushButton { background: #1f3a5f; color: #fff; border: none; border-radius: 6px; padding: 8px 16px; font-weight: 600; }
+QPushButton:hover { background: #29507f; }
+QPushButton:disabled { background: #c3ccd8; color: #eef1f5; }
+QPushButton#Ghost { background: #e8edf4; color: #1f3a5f; }
+QPushButton#Ghost:hover { background: #dbe3ee; }
+QLineEdit, QComboBox, QDateEdit, QSpinBox, QPlainTextEdit, QListWidget, QTableWidget {
+    background: #fff; border: 1px solid #cfd6e0; border-radius: 6px; padding: 5px; }
+QTableWidget { gridline-color: #e8ecf2; }
+QHeaderView::section { background: #eef1f6; border: none; padding: 6px; font-weight: 700; }
+#StatusLog { background: #0f1c2e; color: #cfe0f5; border-radius: 6px; font-family: Consolas, monospace; font-size: 12px; }
