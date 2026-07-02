@@ -1,16 +1,14 @@
-"""② 설정 뷰 — drop·규칙·필터·색·정렬 + 샘플 미리보기."""
+"""② 설정 뷰 — 넣을 항목·강조 규칙·필터를 쉬운 문장으로 지정 + 미리보기."""
 
 from datetime import date
 
 from PySide6.QtWidgets import (
-    QWidget, QFrame, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QListWidget,
-    QListWidgetItem, QTableWidget, QTableWidgetItem, QComboBox, QLineEdit,
-    QSpinBox, QColorDialog, QMessageBox, QGroupBox, QFormLayout, QHeaderView,
+    QWidget, QFrame, QScrollArea, QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QListWidget, QListWidgetItem, QTableWidget, QTableWidgetItem, QComboBox,
+    QLineEdit, QColorDialog, QMessageBox,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
-
-_SWATCH_QSS = "background:{c}; color:#1B2430; border:1px solid rgba(0,0,0,0.18); border-radius:6px; padding:3px 8px; font-weight:700;"
 
 from app.core.engine import process
 from app.core.excel_writer import write_excel
@@ -19,7 +17,18 @@ from app.core.date_util import date_formats
 from app import app_paths
 
 PREVIEW_ROWS = 20
-FILTER_OPS = ["not_null", "equals", "contains", "not_equals"]
+
+# 화면에 보이는 쉬운 말 ↔ 엔진이 쓰는 값
+MATCH_OPTS = [("포함하면", "contains"), ("정확히 같으면", "equals")]
+PRIORITY_OPTS = [("1순위", 1), ("2순위", 2), ("3순위", 3)]
+FILTER_OPTS = [
+    ("비어있지 않은", "not_null"),
+    ("값을 포함하는", "contains"),
+    ("값과 같은", "equals"),
+    ("값과 다른", "not_equals"),
+]
+_SWATCH_QSS = ("background:{c}; color:#1B2430; border:1px solid rgba(0,0,0,0.18); "
+               "border-radius:6px; padding:4px 10px; font-weight:700;")
 
 
 class ConfigureView(QWidget):
@@ -27,171 +36,262 @@ class ConfigureView(QWidget):
         super().__init__()
         self.state = state
         self.main = main
+        self.rule_rows = []      # [{frame, col, kw, match, prio, color}]
+        self.filter_rows = []    # [{frame, col, op, val}]
 
         v = QVBoxLayout(self)
-        v.setContentsMargins(32, 28, 32, 28)
+        v.setContentsMargins(32, 28, 32, 20)
         v.setSpacing(6)
         v.addWidget(QLabel("설정", objectName="H1"))
-        v.addWidget(QLabel("컬럼 제외·우선순위 규칙·필터를 지정하고 엑셀을 생성합니다.", objectName="Hint"))
-        v.addSpacing(16)
-
-        top = QHBoxLayout()
-        top.setSpacing(16)
-        top.addWidget(self._drop_box(), 2)
-        top.addWidget(self._rules_box(), 6)
-        top.addWidget(self._filters_box(), 3)
-        v.addLayout(top)
-
+        v.addWidget(QLabel("리포트에 넣을 항목과 강조·필터 규칙을 정한 뒤 엑셀을 만듭니다.",
+                           objectName="Hint"))
         v.addSpacing(14)
-        opt_card = QFrame(objectName="Card")
-        opt = QFormLayout(opt_card)
-        opt.setContentsMargins(18, 16, 18, 16)
-        opt.setSpacing(12)
-        opt.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
-        self.sort_combo = QComboBox()
-        self.sort_combo.setMinimumHeight(32)
-        self.split_combo = QComboBox()
-        self.split_combo.setMinimumHeight(32)
-        opt.addRow("정렬", self.sort_combo)
-        opt.addRow("시트 분리 열", self.split_combo)
-        v.addWidget(opt_card)
 
-        v.addSpacing(14)
-        v.addWidget(QLabel(f"샘플 미리보기 · 상위 {PREVIEW_ROWS}행", objectName="SectionLabel"))
-        v.addSpacing(4)
-        self.preview = QTableWidget()
+        # 스크롤 본문
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        body = QWidget()
+        b = QVBoxLayout(body)
+        b.setContentsMargins(0, 0, 10, 0)
+        b.setSpacing(16)
+        b.addWidget(self._include_card())
+        b.addWidget(self._rules_card())
+        b.addWidget(self._filters_card())
+        b.addWidget(self._options_card())
+        b.addWidget(self._preview_card())
+        b.addStretch(1)
+        scroll.setWidget(body)
+        v.addWidget(scroll, 1)
+
+        # 하단 고정 액션
+        v.addSpacing(10)
+        bottom = QHBoxLayout()
+        bottom.addStretch(1)
+        self.gen_btn = QPushButton("엑셀 만들기", objectName="Primary")
+        self.gen_btn.setMinimumHeight(40)
+        self.gen_btn.clicked.connect(self._generate)
+        bottom.addWidget(self.gen_btn)
+        v.addLayout(bottom)
+
+    # ---------- 카드 뼈대 ----------
+    def _card(self, title, hint=None):
+        card = QFrame(objectName="Card")
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(18, 16, 18, 18)
+        lay.setSpacing(9)
+        lay.addWidget(QLabel(title, objectName="CardTitle"))
+        if hint:
+            lay.addWidget(QLabel(hint, objectName="Hint"))
+        lay.addWidget(QFrame(objectName="CardDivider"))
+        return card, lay
+
+    def _conn(self, text):
+        return QLabel(text, objectName="Conn")
+
+    def _include_card(self):
+        card, lay = self._card(
+            "① 리포트에 넣을 항목 고르기",
+            "체크한 항목만 엑셀에 들어갑니다. (기본: 전체 포함)")
+        bar = QHBoxLayout()
+        bar.setSpacing(8)
+        all_btn = QPushButton("전체 선택", objectName="Ghost")
+        none_btn = QPushButton("전체 해제", objectName="Ghost")
+        all_btn.clicked.connect(lambda: self._check_all(True))
+        none_btn.clicked.connect(lambda: self._check_all(False))
+        bar.addWidget(all_btn); bar.addWidget(none_btn); bar.addStretch(1)
+        lay.addLayout(bar)
+        self.include_list = QListWidget(objectName="DropList")
+        self.include_list.setFrameShape(QFrame.NoFrame)
+        self.include_list.setMinimumHeight(120)
+        self.include_list.setMaximumHeight(190)
+        lay.addWidget(self.include_list)
+        return card
+
+    def _rules_card(self):
+        card, lay = self._card(
+            "② 중요한 행을 색으로 강조하기",
+            "예: ‘공사명’에 ‘활선’이 포함되면 1순위로 노란색 표시")
+        self.rules_box = QVBoxLayout()
+        self.rules_box.setSpacing(8)
+        lay.addLayout(self.rules_box)
+        add = QPushButton("＋ 강조 규칙 추가", objectName="Ghost")
+        add.clicked.connect(lambda: self._add_rule_row())
+        lay.addWidget(add, alignment=Qt.AlignLeft)
+        return card
+
+    def _filters_card(self):
+        card, lay = self._card(
+            "③ 필요한 행만 추리기 (선택)",
+            "예: ‘지사’가 비어있지 않은 행만 남기기. 조건을 모두 만족하는 행만 남습니다.")
+        self.filters_box = QVBoxLayout()
+        self.filters_box.setSpacing(8)
+        lay.addLayout(self.filters_box)
+        add = QPushButton("＋ 조건 추가", objectName="Ghost")
+        add.clicked.connect(lambda: self._add_filter_row())
+        lay.addWidget(add, alignment=Qt.AlignLeft)
+        return card
+
+    def _options_card(self):
+        card, lay = self._card("④ 정렬 & 시트 나누기")
+        row = QHBoxLayout()
+        row.setSpacing(20)
+        left = QVBoxLayout(); left.setSpacing(5)
+        left.addWidget(QLabel("행 정렬 순서", objectName="FieldLabel"))
+        self.sort_combo = QComboBox(); self.sort_combo.setMinimumHeight(34)
+        left.addWidget(self.sort_combo)
+        right = QVBoxLayout(); right.setSpacing(5)
+        right.addWidget(QLabel("이 항목별로 시트 나누기", objectName="FieldLabel"))
+        self.split_combo = QComboBox(); self.split_combo.setMinimumHeight(34)
+        right.addWidget(self.split_combo)
+        row.addLayout(left); row.addLayout(right)
+        lay.addLayout(row)
+        return card
+
+    def _preview_card(self):
+        card, lay = self._card(
+            "미리보기",
+            f"상위 {PREVIEW_ROWS}행만 표시합니다. 실제 생성은 전체 데이터에 적용됩니다.")
+        self.preview = QTableWidget(objectName="InnerTable")
+        self.preview.setFrameShape(QFrame.NoFrame)
         self.preview.setAlternatingRowColors(True)
         self.preview.verticalHeader().setVisible(False)
         self.preview.setEditTriggers(QTableWidget.NoEditTriggers)
         self.preview.setSelectionMode(QTableWidget.NoSelection)
         self.preview.horizontalHeader().setStretchLastSection(True)
-        v.addWidget(self.preview, 1)
-
-        v.addSpacing(12)
-        btn_row = QHBoxLayout()
-        btn_row.addStretch(1)
-        self.gen_btn = QPushButton("엑셀 생성", objectName="Primary")
-        self.gen_btn.setMinimumHeight(38)
-        self.gen_btn.clicked.connect(self._generate)
-        btn_row.addWidget(self.gen_btn)
-        v.addLayout(btn_row)
-
-    # ---- 섹션 위젯 ----
-    def _section_card(self, title):
-        """제목이 카드 안 상단에 들어가고 얇은 구분선이 있는 섹션 카드."""
-        card = QFrame(objectName="Card")
-        lay = QVBoxLayout(card)
-        lay.setContentsMargins(16, 14, 16, 16)
-        lay.setSpacing(10)
-        lay.addWidget(QLabel(title, objectName="CardTitle"))
-        lay.addWidget(QFrame(objectName="CardDivider"))
-        return card, lay
-
-    def _btn_row(self, add_text, add_slot, table):
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        add = QPushButton(add_text, objectName="Ghost")
-        rm = QPushButton("－ 선택 삭제", objectName="Ghost")
-        add.clicked.connect(add_slot)
-        rm.clicked.connect(lambda: self._remove_row(table))
-        row.addWidget(add); row.addWidget(rm); row.addStretch(1)
-        return row
-
-    def _drop_box(self):
-        card, lay = self._section_card("컬럼 Drop  ·  체크 시 제외")
-        self.drop_list = QListWidget(objectName="DropList")
-        self.drop_list.setFrameShape(QFrame.NoFrame)
-        self.drop_list.setMinimumHeight(140)
-        lay.addWidget(self.drop_list)
+        self.preview.setMinimumHeight(240)
+        lay.addWidget(self.preview)
         return card
 
-    def _rules_box(self):
-        card, lay = self._section_card("우선순위 규칙")
-        self.rules_table = QTableWidget(0, 5)
-        self.rules_table.setObjectName("InnerTable")
-        self.rules_table.setHorizontalHeaderLabels(["열", "키워드", "매칭", "순위", "색"])
-        self.rules_table.setFrameShape(QFrame.NoFrame)
-        self.rules_table.verticalHeader().setVisible(False)
-        self.rules_table.setSelectionMode(QTableWidget.NoSelection)
-        self.rules_table.setMinimumHeight(140)
-        rh = self.rules_table.horizontalHeader()
-        rh.setSectionResizeMode(0, QHeaderView.Fixed)
-        rh.setSectionResizeMode(1, QHeaderView.Stretch)
-        rh.setSectionResizeMode(2, QHeaderView.Fixed)
-        rh.setSectionResizeMode(3, QHeaderView.Fixed)
-        rh.setSectionResizeMode(4, QHeaderView.Fixed)
-        for _c, _w in ((0, 92), (2, 98), (3, 58), (4, 44)):
-            self.rules_table.setColumnWidth(_c, _w)
-        lay.addWidget(self.rules_table)
-        lay.addLayout(self._btn_row("＋ 규칙 추가", lambda: self._add_rule_row(), self.rules_table))
-        return card
-
-    def _filters_box(self):
-        card, lay = self._section_card("필터  ·  모두 만족(AND)")
-        self.filters_table = QTableWidget(0, 3)
-        self.filters_table.setObjectName("InnerTable")
-        self.filters_table.setHorizontalHeaderLabels(["열", "연산", "값"])
-        self.filters_table.setFrameShape(QFrame.NoFrame)
-        self.filters_table.verticalHeader().setVisible(False)
-        self.filters_table.setSelectionMode(QTableWidget.NoSelection)
-        self.filters_table.setMinimumHeight(140)
-        fh = self.filters_table.horizontalHeader()
-        fh.setSectionResizeMode(0, QHeaderView.Stretch)
-        fh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        fh.setSectionResizeMode(2, QHeaderView.Stretch)
-        lay.addWidget(self.filters_table)
-        lay.addLayout(self._btn_row("＋ 필터 추가", lambda: self._add_filter_row(), self.filters_table))
-        return card
-
+    # ---------- 공통 위젯 ----------
     def _col_combo(self):
         c = QComboBox()
+        c.setMinimumHeight(32)
+        c.setMinimumWidth(130)
         c.addItems(self.state.columns())
         return c
 
+    def _mapped_combo(self, opts, width=130):
+        c = QComboBox()
+        c.setMinimumHeight(32)
+        c.setMinimumWidth(width)
+        for label, val in opts:
+            c.addItem(label, val)
+        return c
+
+    @staticmethod
+    def _set_data(combo, value):
+        i = combo.findData(value)
+        combo.setCurrentIndex(i if i >= 0 else 0)
+
+    @staticmethod
+    def _set_text(combo, text):
+        i = combo.findText(text)
+        if i >= 0:
+            combo.setCurrentIndex(i)
+
+    def _del_btn(self):
+        b = QPushButton("✕", objectName="IconBtn")
+        b.setFixedSize(30, 30)
+        b.setToolTip("삭제")
+        return b
+
+    # ---------- 강조 규칙 행 ----------
     def _add_rule_row(self, rule: Rule = None):
-        t = self.rules_table
-        r = t.rowCount()
-        t.insertRow(r)
+        frame = QFrame(objectName="SentenceRow")
+        h = QHBoxLayout(frame)
+        h.setContentsMargins(12, 8, 10, 8)
+        h.setSpacing(8)
         col = self._col_combo()
-        kw = QLineEdit()
-        kw.setPlaceholderText("키워드")
-        match = QComboBox(); match.addItems(["contains", "equals"])
-        pr = QSpinBox(); pr.setRange(1, 3); pr.setAlignment(Qt.AlignCenter)
-        for wdg in (col, kw, match, pr):
-            wdg.setMinimumHeight(30)
-        color_btn = QPushButton("색")
-        color_btn.setFixedWidth(46); color_btn.setMinimumHeight(30)
+        kw = QLineEdit(); kw.setPlaceholderText("찾을 단어"); kw.setMinimumHeight(32)
+        match = self._mapped_combo(MATCH_OPTS, 120)
+        prio = self._mapped_combo(PRIORITY_OPTS, 84)
+        color_btn = QPushButton("색"); color_btn.setFixedWidth(52); color_btn.setMinimumHeight(32)
         color_btn.setProperty("hex", "#FFE14D")
         color_btn.setStyleSheet(_SWATCH_QSS.format(c="#FFE14D"))
-        color_btn.clicked.connect(lambda _, b=color_btn: self._pick_color(b))
+        color_btn.clicked.connect(lambda _, bt=color_btn: self._pick_color(bt))
+        rm = self._del_btn()
+
         if rule:
-            col.setCurrentText(rule.column); kw.setText(rule.keyword)
-            match.setCurrentText(rule.match); pr.setValue(rule.priority)
+            self._set_text(col, rule.column)
+            kw.setText(rule.keyword)
+            self._set_data(match, rule.match)
+            self._set_data(prio, rule.priority)
             color_btn.setProperty("hex", rule.color)
             color_btn.setStyleSheet(_SWATCH_QSS.format(c=rule.color))
-        for i, w in enumerate([col, kw, match, pr, color_btn]):
-            t.setCellWidget(r, i, w)
 
+        h.addWidget(col)
+        h.addWidget(self._conn("에"))
+        h.addWidget(kw, 1)
+        h.addWidget(self._conn("이(가)"))
+        h.addWidget(match)
+        h.addWidget(self._conn("→"))
+        h.addWidget(prio)
+        h.addWidget(self._conn("· 행 색"))
+        h.addWidget(color_btn)
+        h.addWidget(rm)
+
+        entry = {"frame": frame, "col": col, "kw": kw, "match": match,
+                 "prio": prio, "color": color_btn}
+        rm.clicked.connect(lambda: self._remove_row(entry, self.rule_rows))
+        self.rule_rows.append(entry)
+        self.rules_box.addWidget(frame)
+
+    # ---------- 필터 행 ----------
     def _add_filter_row(self, flt: Filter = None):
-        t = self.filters_table
-        r = t.rowCount()
-        t.insertRow(r)
+        frame = QFrame(objectName="SentenceRow")
+        h = QHBoxLayout(frame)
+        h.setContentsMargins(12, 8, 10, 8)
+        h.setSpacing(8)
         col = self._col_combo()
-        col.setMinimumWidth(88)
-        op = QComboBox(); op.addItems(FILTER_OPS)
-        val = QLineEdit()
-        val.setPlaceholderText("값")
-        for wdg in (col, op, val):
-            wdg.setMinimumHeight(30)
-        if flt:
-            col.setCurrentText(flt.column); op.setCurrentText(flt.op); val.setText(flt.value)
-        for i, w in enumerate([col, op, val]):
-            t.setCellWidget(r, i, w)
+        op = self._mapped_combo(FILTER_OPTS, 150)
+        val = QLineEdit(); val.setPlaceholderText("값"); val.setMinimumHeight(32)
+        rm = self._del_btn()
 
-    def _remove_row(self, table):
-        r = table.currentRow()
-        if r >= 0:
-            table.removeRow(r)
+        if flt:
+            self._set_text(col, flt.column)
+            self._set_data(op, flt.op)
+            val.setText(flt.value)
+
+        entry = {"frame": frame, "col": col, "op": op, "val": val}
+        op.currentIndexChanged.connect(lambda _=0, e=entry: self._sync_filter_value(e))
+
+        h.addWidget(col)
+        h.addWidget(self._conn("이(가)"))
+        h.addWidget(op)
+        h.addWidget(val, 1)
+        h.addWidget(self._conn("행만 표시"))
+        h.addWidget(rm)
+
+        rm.clicked.connect(lambda: self._remove_row(entry, self.filter_rows))
+        self.filter_rows.append(entry)
+        self.filters_box.addWidget(frame)
+        self._sync_filter_value(entry)
+
+    def _sync_filter_value(self, entry):
+        """‘비어있지 않은’ 조건은 값이 필요 없으므로 값 칸을 비활성화."""
+        needs_value = entry["op"].currentData() != "not_null"
+        entry["val"].setEnabled(needs_value)
+        if not needs_value:
+            entry["val"].clear()
+            entry["val"].setPlaceholderText("값 필요 없음")
+        else:
+            entry["val"].setPlaceholderText("값")
+
+    def _remove_row(self, entry, rows):
+        entry["frame"].setParent(None)
+        if entry in rows:
+            rows.remove(entry)
+
+    def _clear_rows(self, rows):
+        for e in list(rows):
+            e["frame"].setParent(None)
+        rows.clear()
+
+    def _check_all(self, checked: bool):
+        state = Qt.Checked if checked else Qt.Unchecked
+        for i in range(self.include_list.count()):
+            self.include_list.item(i).setCheckState(state)
 
     def _pick_color(self, btn):
         cur = QColor(btn.property("hex"))
@@ -200,21 +300,30 @@ class ConfigureView(QWidget):
             btn.setProperty("hex", c.name().upper())
             btn.setStyleSheet(_SWATCH_QSS.format(c=c.name()))
 
-    # ---- 데이터 로드 / 프리셋 ----
+    # ---------- 데이터 로드 / 프리셋 ----------
     def load_dataframe(self):
         cols = self.state.columns()
-        self.drop_list.clear()
+        self.include_list.clear()
         for c in cols:
             it = QListWidgetItem(c)
             it.setFlags(it.flags() | Qt.ItemIsUserCheckable)
-            it.setCheckState(Qt.Unchecked)
-            self.drop_list.addItem(it)
+            it.setCheckState(Qt.Checked)   # 기본: 전체 포함
+            self.include_list.addItem(it)
+
         self.sort_combo.clear()
-        self.sort_combo.addItems(["none", "priority"] + cols)
+        self.sort_combo.addItem("정렬 안 함", "none")
+        self.sort_combo.addItem("중요도(우선순위)순", "priority")
+        for c in cols:
+            self.sort_combo.addItem(f"{c} 순", c)
+
         self.split_combo.clear()
-        self.split_combo.addItems([""] + cols)
+        self.split_combo.addItem("나누지 않음", "")
+        for c in cols:
+            self.split_combo.addItem(f"{c} 별로", c)
+
+        self._clear_rows(self.rule_rows)
+        self._clear_rows(self.filter_rows)
         self._fill_preview()
-        # 프리셋 값이 있으면 반영
         self.apply_preset(self.state.preset)
 
     def _fill_preview(self):
@@ -233,47 +342,47 @@ class ConfigureView(QWidget):
         cols = self.state.columns()
         if not cols:
             return
-        for i in range(self.drop_list.count()):
-            it = self.drop_list.item(i)
-            it.setCheckState(Qt.Checked if it.text() in preset.drop_columns else Qt.Unchecked)
-        self.rules_table.setRowCount(0)
+        # 포함 체크: 제외 목록(drop_columns)에 없으면 체크
+        for i in range(self.include_list.count()):
+            it = self.include_list.item(i)
+            it.setCheckState(Qt.Unchecked if it.text() in preset.drop_columns else Qt.Checked)
+        # 규칙·필터 재구성
+        self._clear_rows(self.rule_rows)
         for rule in preset.rules:
             self._add_rule_row(rule)
-        self.filters_table.setRowCount(0)
+        self._clear_rows(self.filter_rows)
         for flt in preset.filters:
             self._add_filter_row(flt)
-        if preset.sort:
-            self.sort_combo.setCurrentText(preset.sort)
-        self.split_combo.setCurrentText(preset.sheet_split_column)
+        # 정렬·시트 분리
+        self._set_data(self.sort_combo, preset.sort or "none")
+        self._set_data(self.split_combo, preset.sheet_split_column or "")
 
     def write_into(self, preset):
         # 데이터 미로드 상태에서는 설정 위젯이 비어 있으므로,
         # 기존 프리셋 값을 덮어쓰지 않도록 아무것도 기록하지 않는다.
         if self.state.df is None:
             return
+        # 체크 안 된 항목 = 리포트에서 제외
         preset.drop_columns = [
-            self.drop_list.item(i).text()
-            for i in range(self.drop_list.count())
-            if self.drop_list.item(i).checkState() == Qt.Checked
+            self.include_list.item(i).text()
+            for i in range(self.include_list.count())
+            if self.include_list.item(i).checkState() != Qt.Checked
         ]
-        preset.rules = []
-        for r in range(self.rules_table.rowCount()):
-            col = self.rules_table.cellWidget(r, 0).currentText()
-            kw = self.rules_table.cellWidget(r, 1).text()
-            match = self.rules_table.cellWidget(r, 2).currentText()
-            pr = self.rules_table.cellWidget(r, 3).value()
-            color = self.rules_table.cellWidget(r, 4).property("hex")
-            preset.rules.append(Rule(column=col, keyword=kw, match=match, priority=pr, color=color))
-        preset.filters = []
-        for r in range(self.filters_table.rowCount()):
-            col = self.filters_table.cellWidget(r, 0).currentText()
-            op = self.filters_table.cellWidget(r, 1).currentText()
-            val = self.filters_table.cellWidget(r, 2).text()
-            preset.filters.append(Filter(column=col, op=op, value=val))
-        preset.sort = self.sort_combo.currentText()
-        preset.sheet_split_column = self.split_combo.currentText()
+        preset.rules = [
+            Rule(column=e["col"].currentText(), keyword=e["kw"].text(),
+                 match=e["match"].currentData(), priority=e["prio"].currentData(),
+                 color=e["color"].property("hex"))
+            for e in self.rule_rows
+        ]
+        preset.filters = [
+            Filter(column=e["col"].currentText(), op=e["op"].currentData(),
+                   value=e["val"].text())
+            for e in self.filter_rows
+        ]
+        preset.sort = self.sort_combo.currentData() or "none"
+        preset.sheet_split_column = self.split_combo.currentData() or ""
 
-    # ---- 생성 ----
+    # ---------- 생성 ----------
     def _generate(self):
         if self.state.df is None:
             QMessageBox.warning(self, "설정", "먼저 데이터를 불러오세요.")
@@ -289,7 +398,8 @@ class ConfigureView(QWidget):
         try:
             write_excel(processed, out, self.state.preset.sheet_split_column)
         except (PermissionError, OSError) as e:
-            QMessageBox.critical(self, "저장 실패", f"파일 저장에 실패했습니다.\n파일이 열려 있으면 닫고 다시 시도하세요.\n{e}")
+            QMessageBox.critical(self, "저장 실패",
+                                 f"파일 저장에 실패했습니다.\n파일이 열려 있으면 닫고 다시 시도하세요.\n{e}")
             return
         self.state.output_path = out
         QMessageBox.information(self, "생성 완료", f"저장됨:\n{out}")
