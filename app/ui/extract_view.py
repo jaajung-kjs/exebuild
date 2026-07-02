@@ -74,7 +74,7 @@ class ExtractView(QWidget):
         sv.setSpacing(10)
         sv.addWidget(QLabel("실행할 작업", objectName="CardTitle"))
         sv.addWidget(QFrame(objectName="CardDivider"))
-        c1 = QCheckBox("1. 데이터 불러오기  (필수)")
+        c1 = QCheckBox("1. 원본 데이터 다운로드  (필수)")
         c1.setChecked(True)
         c1.setEnabled(False)
         self.chk_process = QCheckBox("2. 설정(정렬·강조·필터) 적용해서 저장")
