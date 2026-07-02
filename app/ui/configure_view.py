@@ -127,7 +127,7 @@ class ConfigureView(QWidget):
 
     def _filters_card(self):
         card, lay = self._card(
-            "③ 필요한 행만 추리기 (선택)",
+            "③ 필요한 행만 추리기",
             "예: ‘지사’가 비어있지 않은 행만 남기기. 조건이 없으면 전체 행이 그대로 유지됩니다.")
         mode_row = QHBoxLayout()
         mode_row.setSpacing(8)
@@ -348,7 +348,8 @@ class ConfigureView(QWidget):
         self._set_data(self.mode_combo, preset.filter_mode or "and")
         # 정렬·시트 분리
         self._set_data(self.sort_combo, preset.sort or "none")
-        self._set_data(self.split_combo, preset.sheet_split_column or "")
+        # 저장된 값이 없으면 기본으로 '2차사업소별로' 선택
+        self._set_data(self.split_combo, preset.sheet_split_column or "2차사업소")
 
     def write_into(self, preset):
         # 데이터 미로드 상태에서는 설정 위젯이 비어 있으므로,

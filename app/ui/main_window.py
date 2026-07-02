@@ -3,6 +3,11 @@
 설정은 QSettings(윈도우 레지스트리)에 저장되어 파일을 만들지 않는다(사내 DRM 회피).
 프로그램 시작 시 자동 복원, [설정 저장]으로 갱신."""
 
+import sys
+from pathlib import Path
+
+from PySide6.QtCore import Qt
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QHBoxLayout, QVBoxLayout, QListWidget,
     QStackedWidget, QLabel, QMessageBox,
@@ -28,7 +33,7 @@ class MainWindow(QMainWindow):
         sb = QVBoxLayout(sidebar)
         sb.setContentsMargins(0, 0, 0, 0)
         sb.setSpacing(0)
-        sb.addWidget(QLabel("KEPCO", objectName="Brand"))
+        sb.addWidget(self._brand_header())
         sb.addWidget(QLabel("점검 리스트 생성기", objectName="BrandSub"))
         self.nav = QListWidget()
         self.nav.addItems(["①   실행", "②   설정", "③   메일"])
@@ -55,6 +60,26 @@ class MainWindow(QMainWindow):
         row.addWidget(self.stack, 1)
         self.setCentralWidget(root)
         self.nav.setCurrentRow(0)
+
+    @staticmethod
+    def _ui_dir() -> Path:
+        if getattr(sys, "frozen", False):
+            return Path(getattr(sys, "_MEIPASS", Path(sys.executable).parent)) / "app" / "ui"
+        return Path(__file__).resolve().parent
+
+    def _brand_header(self) -> QWidget:
+        row = QWidget()
+        h = QHBoxLayout(row)
+        h.setContentsMargins(22, 22, 22, 2)
+        h.setSpacing(9)
+        logo = QLabel()
+        pix = QPixmap(str(self._ui_dir() / "logo.svg"))
+        if not pix.isNull():
+            logo.setPixmap(pix.scaledToHeight(26, Qt.SmoothTransformation))
+        h.addWidget(logo)
+        h.addWidget(QLabel("KEPCO", objectName="Brand"))
+        h.addStretch(1)
+        return row
 
     # ---- 네비게이션 ----
     def _nav_changed(self, row: int):

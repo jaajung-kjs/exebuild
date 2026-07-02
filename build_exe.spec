@@ -13,6 +13,7 @@ a = Analysis(
     datas=[
         ('app/ui/theme.qss', 'app/ui'),   # QSS 테마 번들
         ('app/ui/check.svg', 'app/ui'),   # 체크박스 체크표시 아이콘
+        ('app/ui/logo.svg', 'app/ui'),    # 사이드바 로고
     ],
     hiddenimports=[
         'PySide6',
