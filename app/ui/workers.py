@@ -18,11 +18,18 @@ class DownloadWorker(QThread):
 
     def run(self):
         try:
-            # 재시도 없음(1회). 서버 엑셀 생성이 느려도(수십 초) 넉넉한 타임아웃으로 기다린다.
-            self.status.emit("인증 및 다운로드 중… (서버 생성에 수십 초 걸릴 수 있으니 기다려 주세요)")
+            # 재시도 없음(1회). 서버 엑셀 생성이 느려도(수십 초~수 분) 넉넉히 기다린다.
+            self.status.emit("인증 중…")
+
+            def _download(session, date_from, department_code):
+                # 다운로드 진단 메시지를 UI 로그로 그대로 전달
+                return downloader.download_excel_to_dataframe(
+                    session, date_from=date_from, department_code=department_code,
+                    on_status=self.status.emit)
+
             session, df = run_auth_and_download(
                 authenticate=auth.authenticate,
-                download=downloader.download_excel_to_dataframe,
+                download=_download,
                 date_from=self._date_from,
                 department_code=self._dept,
                 max_retries=1,

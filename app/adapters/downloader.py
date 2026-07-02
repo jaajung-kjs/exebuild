@@ -3,6 +3,7 @@ Excel download module for KEPCO Work Monitor
 Returns DataFrame directly for in-memory processing
 """
 
+import time
 import requests
 from datetime import datetime, timedelta
 import pandas as pd
@@ -21,23 +22,28 @@ def is_valid_schema(df, min_columns: int = MIN_VALID_COLUMNS) -> bool:
     return len(df.columns) >= min_columns
 
 
-def download_excel_to_dataframe(session, date_from=None, date_to=None, department_code=None):
+def download_excel_to_dataframe(session, date_from=None, date_to=None,
+                                department_code=None, on_status=None):
     """
     Download Excel from Work Monitor and return as DataFrame
 
     Args:
         session (requests.Session): Authenticated session
-        date_from (str): Start date (YYYY-MM-DD), default: tomorrow
-        date_to (str): End date (YYYY-MM-DD), default: tomorrow
-        department_code (str): Department code, default: from config.DEPARTMENT_CODE
+        date_from (str): Start date (YYYY-MM-DD)
+        date_to (str): End date (YYYY-MM-DD)
+        department_code (str): Department code
+        on_status (callable): 진행/진단 메시지 콜백 (UI 로그 표시용)
 
     Returns:
         pandas.DataFrame: Downloaded data
         None: If download fails
     """
-    print("=" * 60)
-    print("엑셀 다운로드")
-    print("=" * 60)
+    def s(msg):
+        print(msg)
+        if on_status:
+            on_status(msg)
+
+    s("엑셀 다운로드 시작")
 
     # Use provided department_code or fallback to config
     if department_code is None:
@@ -96,7 +102,9 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None, departmen
             'day_select': '2'
         }
 
-        # Download Excel
+        # Download Excel (서버가 엑셀 생성에 수십 초~수 분 걸릴 수 있음)
+        s(f"서버에 요청({LIST_COUNT}건) — 응답 대기 중… (최대 {DOWNLOAD_TIMEOUT}초)")
+        t0 = time.monotonic()
         response = session.post(
             f'{WORK_MONITOR_URL}/WORK/DAYWORK/excel_extract.php',
             data=data,
@@ -104,71 +112,51 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None, departmen
             stream=True,
             timeout=DOWNLOAD_TIMEOUT
         )
+        body = response.content   # 여기서 전체 수신 완료까지 대기
+        elapsed = time.monotonic() - t0
+        ctype = response.headers.get('Content-Type', '')
+        s(f"응답 수신: {elapsed:.1f}초 · 상태 {response.status_code} · {len(body)}바이트 · {ctype}")
 
-        if response.status_code == 200:
-            # Read content into memory
-            content = BytesIO(response.content)
-
-            # Check if empty
-            if len(response.content) == 0:
-                print(f"\n[실패] 빈 파일 (데이터 없음)")
-                print(f"        해당 날짜에 데이터가 없을 수 있습니다")
-                return None
-
-            # Check if HTML format (server returns HTML table)
-            first_bytes = response.content[:100]
-            is_html = b'<' in first_bytes or b'html' in first_bytes.lower()
-
-            if is_html:
-                print(f"[감지] HTML 형식 파일")
-                print(f"[변환] HTML → DataFrame 변환 중...")
-
-                # Read HTML table with first row as header
-                dfs = pd.read_html(
-                    BytesIO(response.content),
-                    encoding='euc-kr',
-                    header=0
-                )
-
-                if dfs and len(dfs) > 0:
-                    df = dfs[0]
-                else:
-                    print(f"[실패] HTML 테이블을 찾을 수 없습니다")
-                    return None
-            else:
-                # Read as Excel file
-                print(f"[변환] Excel → DataFrame 변환 중...")
-                df = pd.read_excel(content, engine='xlrd')
-
-            # Validate: server error returns 1-column DataFrame with error message
-            if not is_valid_schema(df):
-                first_value = str(df.iloc[0, 0]) if len(df) > 0 else ''
-                print(f"[실패] 서버 오류 응답 (열 {len(df.columns)}개)")
-                print(f"        내용: {first_value[:100]}")
-                return None
-
-            print(f"[성공] DataFrame 생성 완료!")
-            print(f"        행 수: {len(df)}")
-            print(f"        열 수: {len(df.columns)}")
-            print("=" * 60 + "\n")
-            return df
-
-        else:
-            print(f"\n[실패] HTTP 오류")
-            print(f"        상태 코드: {response.status_code}")
-            print(f"        응답: {response.text[:200]}")
+        if response.status_code != 200:
+            s(f"[실패] HTTP 오류 {response.status_code} — {response.text[:150]}")
+            return None
+        if len(body) == 0:
+            s("[실패] 빈 응답 — 해당 날짜에 데이터가 없을 수 있습니다.")
             return None
 
+        first_bytes = body[:100]
+        is_html = b'<' in first_bytes or b'html' in first_bytes.lower()
+        try:
+            if is_html:
+                dfs = pd.read_html(BytesIO(body), encoding='euc-kr', header=0)
+                if not dfs:
+                    s("[실패] HTML에서 표를 찾지 못함")
+                    return None
+                df = dfs[0]
+            else:
+                df = pd.read_excel(BytesIO(body), engine='xlrd')
+        except Exception as e:  # noqa: BLE001
+            s(f"[실패] 응답 파싱 오류: {e} · 앞부분: {first_bytes[:60]!r}")
+            return None
+
+        if not is_valid_schema(df):
+            first_value = str(df.iloc[0, 0]) if len(df) > 0 else ''
+            s(f"[실패] 예상과 다른 응답 (열 {len(df.columns)}개) — 내용: {first_value[:100]}")
+            return None
+
+        s(f"[성공] {len(df)}행 × {len(df.columns)}열 ({elapsed:.1f}초)")
+        return df
+
     except requests.exceptions.Timeout:
-        print(f"\n[실패] 타임아웃 ({DOWNLOAD_TIMEOUT}초 초과)")
+        s(f"[실패] 타임아웃 — 서버가 {DOWNLOAD_TIMEOUT}초 안에 응답하지 않음")
         return None
 
     except requests.exceptions.RequestException as e:
-        print(f"\n[실패] 네트워크 오류: {e}")
+        s(f"[실패] 네트워크 오류: {e}")
         return None
 
     except Exception as e:
-        print(f"\n[실패] 예상치 못한 오류: {e}")
+        s(f"[실패] 예상치 못한 오류: {e}")
         import traceback
         traceback.print_exc()
         return None
