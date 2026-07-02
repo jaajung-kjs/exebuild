@@ -45,3 +45,7 @@ PowerGate/
 # PyInstaller
 *.manifest
 *.spec.lock
+
+# 분석용 임시 데이터(실제 업무 데이터 포함 — 커밋 금지)
+d.txt
+*.har
