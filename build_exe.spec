@@ -7,13 +7,14 @@ Build command: pyinstaller build_exe.spec
 block_cipher = None
 
 a = Analysis(
-    ['main_경남.py'],
+    ['app/main.py'],
     pathex=[],
     binaries=[],
     datas=[
-        ('분류표.xlsx', '.'),  # Bundle classification file
+        ('app/ui/theme.qss', 'app/ui'),  # QSS 테마 번들
     ],
     hiddenimports=[
+        'PySide6',
         'websockets',
         'requests',
         'pandas',
