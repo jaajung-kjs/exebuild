@@ -55,7 +55,7 @@ class MailView(QWidget):
         bottom.addStretch(1)
         self.save_btn = QPushButton("설정 저장", objectName="Primary")
         self.save_btn.setMinimumHeight(40)
-        self.save_btn.clicked.connect(lambda: self.main._save_preset())
+        self.save_btn.clicked.connect(lambda: self.main._save_config())
         bottom.addWidget(self.save_btn)
         v.addLayout(bottom)
         v.addStretch(1)

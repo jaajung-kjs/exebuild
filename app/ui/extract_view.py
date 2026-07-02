@@ -84,8 +84,8 @@ class ExtractView(QWidget):
             sv.addWidget(c)
         sv.addWidget(QLabel(
             "· 2번을 끄면 원본 그대로 저장합니다.\n"
-            "· 설정을 미리 적용하려면 왼쪽 아래에서 프리셋을 불러오세요. "
-            "(프리셋이 없으면 실행 후 설정 화면으로 안내합니다.)",
+            "· 설정은 ②·③ 탭에서 정하고 [설정 저장]하면 자동 저장·복원됩니다. "
+            "(설정이 없으면 실행 후 설정 화면으로 안내합니다.)",
             objectName="Hint"))
         v.addWidget(steps)
 

@@ -1,16 +1,18 @@
-"""메인 윈도우 — 사이드바 네비게이션 + 프리셋 바."""
+"""메인 윈도우 — 사이드바 네비게이션 + 설정 자동 저장·복원.
+
+설정은 QSettings(윈도우 레지스트리)에 저장되어 파일을 만들지 않는다(사내 DRM 회피).
+프로그램 시작 시 자동 복원, [설정 저장]으로 갱신."""
 
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QFrame, QHBoxLayout, QVBoxLayout, QListWidget,
-    QStackedWidget, QLabel, QPushButton, QComboBox, QInputDialog, QMessageBox,
+    QStackedWidget, QLabel, QPushButton, QMessageBox,
 )
 
 from app.ui.state import AppState
 from app.ui.extract_view import ExtractView
 from app.ui.configure_view import ConfigureView
 from app.ui.mail_view import MailView
-from app.core import preset_store
-from app import app_paths
+from app.ui import config_store
 
 
 class MainWindow(QMainWindow):
@@ -19,6 +21,7 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("KEPCO 점검 리스트 생성기")
         self.resize(1080, 720)
         self.state = AppState()
+        self.state.preset = config_store.load_config()   # 저장된 설정 자동 복원
 
         # 사이드바
         sidebar = QWidget(objectName="Sidebar")
@@ -32,7 +35,7 @@ class MainWindow(QMainWindow):
         self.nav.currentRowChanged.connect(self._nav_changed)
         sb.addWidget(self.nav)
         sb.addStretch(1)
-        sb.addWidget(self._preset_bar())
+        sb.addWidget(self._config_bar())
 
         # 본문 스택
         self.stack = QStackedWidget()
@@ -41,6 +44,9 @@ class MainWindow(QMainWindow):
         self.mail = MailView(self.state, self)
         for w in (self.extract, self.configure, self.mail):
             self.stack.addWidget(w)
+
+        # 복원된 설정을 각 화면에 반영(날짜·본부·메일 등)
+        self.apply_preset(self.state.preset)
 
         root = QWidget()
         row = QHBoxLayout(root)
@@ -51,24 +57,18 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(root)
         self.nav.setCurrentRow(0)
 
-    def _preset_bar(self) -> QWidget:
+    def _config_bar(self) -> QWidget:
         bar = QFrame(objectName="PresetPanel")
         v = QVBoxLayout(bar)
         v.setContentsMargins(16, 14, 16, 16)
         v.setSpacing(8)
-        self.preset_combo = QComboBox()
-        self._reload_presets()
-        load = QPushButton("불러오기", objectName="PresetBtn")
-        save = QPushButton("저장", objectName="PresetBtn")
-        load.clicked.connect(self._load_preset)
-        save.clicked.connect(self._save_preset)
-        v.addWidget(QLabel("프리셋", objectName="PresetLabel"))
-        v.addWidget(self.preset_combo)
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        row.addWidget(load)
-        row.addWidget(save)
-        v.addLayout(row)
+        v.addWidget(QLabel("설정", objectName="PresetLabel"))
+        hint = QLabel("한 번 저장하면 자동으로 복원됩니다.", objectName="PresetLabel")
+        hint.setWordWrap(True)
+        v.addWidget(hint)
+        btn = QPushButton("설정 저장", objectName="PresetBtn")
+        btn.clicked.connect(self._save_config)
+        v.addWidget(btn)
         return bar
 
     # ---- 네비게이션 ----
@@ -79,31 +79,12 @@ class MainWindow(QMainWindow):
     def goto(self, index: int):
         self.nav.setCurrentRow(index)
 
-    # ---- 프리셋 ----
-    def _reload_presets(self):
-        self.preset_combo.clear()
-        self.preset_combo.addItems(preset_store.list_presets(app_paths.presets_dir()))
-
-    def _load_preset(self):
-        name = self.preset_combo.currentText()
-        if not name:
-            return
-        preset = preset_store.load_preset(name, app_paths.presets_dir())
-        self.state.preset = preset
-        self.apply_preset(preset)
-        QMessageBox.information(self, "프리셋", f"'{name}' 불러오기 완료")
-
-    def _save_preset(self):
-        preset = self.collect_preset()
-        name, ok = QInputDialog.getText(self, "프리셋 저장", "이름:", text=preset.name)
-        if not ok or not name.strip():
-            return
-        preset.name = name.strip()
-        preset_store.save_preset(preset, app_paths.presets_dir())
-        self.state.preset = preset
-        self._reload_presets()
-        self.preset_combo.setCurrentText(preset.name)
-        QMessageBox.information(self, "프리셋", f"'{preset.name}' 저장 완료")
+    # ---- 설정 저장/복원 ----
+    def _save_config(self):
+        self.collect_preset()                       # 모든 탭 → state.preset
+        config_store.save_config(self.state.preset)  # 레지스트리에 영구 저장
+        QMessageBox.information(self, "설정 저장",
+                                "설정을 저장했습니다.\n다음 실행부터 자동으로 적용됩니다.")
 
     def apply_preset(self, preset):
         self.extract.apply_preset(preset)
