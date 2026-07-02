@@ -50,7 +50,7 @@ def assign_priority(df: pd.DataFrame, rules: list[Rule]) -> pd.DataFrame:
                 hit = value == rule.keyword
             else:  # contains
                 hit = rule.keyword in value
-            if hit:
+            if hit and rule.priority in PRIORITY_LABELS:
                 priority = rule.priority
                 color = rule.color
         labels.append(PRIORITY_LABELS.get(priority, "3순위"))
@@ -77,6 +77,9 @@ def sort_df(df: pd.DataFrame, sort: str) -> pd.DataFrame:
 def process(df: pd.DataFrame, preset: Preset) -> pd.DataFrame:
     """전체 파이프라인: 필터 → 우선순위 → drop → 정렬.
     (우선순위·필터를 drop보다 먼저 실행해 drop된 열도 규칙에 사용 가능)"""
+    dups = df.columns[df.columns.duplicated()].unique().tolist()
+    if dups:
+        raise ValueError(f"중복된 열 이름이 있어 처리할 수 없습니다: {dups}")
     out = apply_filters(df, preset.filters)
     out = assign_priority(out, preset.rules)
     out = apply_drop(out, preset.drop_columns)

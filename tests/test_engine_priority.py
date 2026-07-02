@@ -1,4 +1,5 @@
 import pandas as pd
+import pytest
 from app.core.engine import assign_priority, sort_df, process
 from app.core.settings import Preset, Rule, Filter
 
@@ -44,6 +45,33 @@ def test_sort_by_priority():
 def test_sort_none_keeps_order():
     df = assign_priority(_df(), [])
     out = sort_df(df, "none")
+    assert list(out["지사"]) == ["강릉", "원주", "속초"]
+
+
+def test_process_rejects_duplicate_headers():
+    df = pd.DataFrame([[1, 2], [3, 4]], columns=["지사", "지사"])
+    with pytest.raises(ValueError, match="중복된 열 이름"):
+        process(df, Preset(name="t", department_code="4200"))
+
+
+def test_assign_priority_ignores_out_of_range_priority():
+    rules = [Rule(column="공사명", keyword="활선", priority=5, color="#FFFF00")]
+    out = assign_priority(_df(), rules)
+    assert list(out["점검순위"]) == ["3순위", "3순위", "3순위"]
+    assert list(out["_row_color"]) == ["", "", ""]
+
+
+def test_sort_by_priority_reorders_shuffled_input():
+    df = pd.DataFrame({
+        "지사": ["속초", "강릉", "원주"],
+        "공사명": ["일반 보수", "활선 작업", "변전 점검"],
+    })
+    ranked = assign_priority(df, [
+        Rule(column="공사명", keyword="활선", priority=1, color="#FFFF00"),
+        Rule(column="공사명", keyword="변전", priority=2, color="#F7B9AF"),
+    ])
+    out = sort_df(ranked, "priority")
+    assert list(out["점검순위"]) == ["1순위", "2순위", "3순위"]
     assert list(out["지사"]) == ["강릉", "원주", "속초"]
 
 
