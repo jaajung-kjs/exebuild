@@ -28,7 +28,7 @@ class MainWindow(QMainWindow):
         sb.addWidget(QLabel("KEPCO", objectName="Brand"))
         sb.addWidget(QLabel("점검 리스트 생성기", objectName="BrandSub"))
         self.nav = QListWidget()
-        self.nav.addItems(["①   추출", "②   설정", "③   메일 (베타)"])
+        self.nav.addItems(["①   실행", "②   설정", "③   메일 (베타)"])
         self.nav.currentRowChanged.connect(self._nav_changed)
         sb.addWidget(self.nav)
         sb.addStretch(1)

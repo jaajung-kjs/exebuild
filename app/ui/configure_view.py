@@ -413,30 +413,46 @@ class ConfigureView(QWidget):
         fmts = date_formats(self.state.target_date or date.today())
         return str(app_paths.output_dir() / f"{fmts['yymmdd']} 공사현장 점검 {suffix}.xlsx")
 
-    def _save(self):
-        """설정(넣을 항목·강조·필터·정렬)을 적용한 엑셀 저장."""
+    def save_processed(self) -> str | None:
+        """설정을 적용해 저장. 성공 시 경로, 실패 시 None. (안내창 없음 — 실행 흐름에서 재사용)"""
         if self.state.df is None:
-            QMessageBox.warning(self, "저장", "먼저 데이터를 불러오세요.")
-            return
+            return None
         self.write_into(self.state.preset)
         try:
             processed = process(self.state.df, self.state.preset)
         except ValueError as e:
             QMessageBox.critical(self, "저장 실패", str(e))
-            return
+            return None
         out = self._out_path("우선순위 리스트")
         if self._write(processed, out, self.state.preset.sheet_split_column):
             self.state.output_path = out
-            self._after_save(out)
+            return out
+        return None
 
-    def _save_raw(self):
-        """가공 없이 다운로드한 데이터 그대로 저장."""
+    def save_raw(self) -> str | None:
+        """가공 없이 원본 저장. 성공 시 경로, 실패 시 None."""
         if self.state.df is None:
-            QMessageBox.warning(self, "원본 저장", "먼저 데이터를 불러오세요.")
-            return
+            return None
         out = self._out_path("원본")
         if self._write(self.state.df, out, ""):
             self.state.output_path = out
+            return out
+        return None
+
+    def _save(self):
+        if self.state.df is None:
+            QMessageBox.warning(self, "저장", "먼저 데이터를 불러오세요.")
+            return
+        out = self.save_processed()
+        if out:
+            self._after_save(out)
+
+    def _save_raw(self):
+        if self.state.df is None:
+            QMessageBox.warning(self, "원본 저장", "먼저 데이터를 불러오세요.")
+            return
+        out = self.save_raw()
+        if out:
             self._after_save(out)
 
     def _write(self, df, out, split) -> bool:
