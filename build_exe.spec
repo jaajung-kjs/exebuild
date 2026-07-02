@@ -4,24 +4,16 @@ PyInstaller spec file for KEPCO RPA
 Build command: pyinstaller build_exe.spec
 """
 
-import os
-
 block_cipher = None
-
-_datas = [
-    ('app/ui/theme.qss', 'app/ui'),   # QSS 테마 번들
-    ('app/ui/check.svg', 'app/ui'),   # 체크박스 체크표시 아이콘
-    ('app/ui/logo.svg', 'app/ui'),    # 기본 로고 엠블럼
-]
-# 공식 로고(app/ui/logo.png)가 있으면 함께 번들
-if os.path.exists('app/ui/logo.png'):
-    _datas.append(('app/ui/logo.png', 'app/ui'))
 
 a = Analysis(
     ['app/main.py'],
     pathex=[],
     binaries=[],
-    datas=_datas,
+    datas=[
+        ('app/ui/theme.qss', 'app/ui'),   # QSS 테마 번들
+        ('app/ui/check.svg', 'app/ui'),   # 체크박스 체크표시 아이콘
+    ],
     hiddenimports=[
         'PySide6',
         'PySide6.QtSvg',
