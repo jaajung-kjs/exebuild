@@ -73,7 +73,12 @@ class MainWindow(QMainWindow):
         h.setContentsMargins(22, 22, 22, 2)
         h.setSpacing(9)
         logo = QLabel()
-        pix = QPixmap(str(self._ui_dir() / "logo.svg"))
+        ui = self._ui_dir()
+        # 공식 로고가 있으면(app/ui/logo.png) 우선 사용, 없으면 기본 엠블럼(logo.svg)
+        path = ui / "logo.png"
+        if not path.exists():
+            path = ui / "logo.svg"
+        pix = QPixmap(str(path))
         if not pix.isNull():
             logo.setPixmap(pix.scaledToHeight(26, Qt.SmoothTransformation))
         h.addWidget(logo)
