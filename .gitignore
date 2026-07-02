@@ -27,6 +27,9 @@ ENV/
 .DS_Store
 Thumbs.db
 
+# Brainstorming visual companion (local mockups)
+.superpowers/
+
 # PowerGate (local tool, not part of project)
 PowerGate/
 
