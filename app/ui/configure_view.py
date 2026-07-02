@@ -44,7 +44,7 @@ class ConfigureView(QWidget):
         v.setContentsMargins(32, 28, 32, 20)
         v.setSpacing(6)
         v.addWidget(QLabel("설정", objectName="H1"))
-        v.addWidget(QLabel("리포트에 넣을 항목과 강조·필터 규칙을 정한 뒤 엑셀을 만듭니다.",
+        v.addWidget(QLabel("안전 우선순위에 포함할 항목과 강조·필터 규칙을 정한 뒤 엑셀을 만듭니다.",
                            objectName="Hint"))
         v.addSpacing(14)
 
@@ -96,7 +96,7 @@ class ConfigureView(QWidget):
 
     def _include_card(self):
         card, lay = self._card(
-            "① 리포트에 넣을 항목 고르기",
+            "① 안전 우선순위에 포함할 항목 고르기",
             "체크한 항목만 엑셀에 들어갑니다. (기본: 전체 포함)")
         bar = QHBoxLayout()
         bar.setSpacing(8)
@@ -355,7 +355,7 @@ class ConfigureView(QWidget):
         # 기존 프리셋 값을 덮어쓰지 않도록 아무것도 기록하지 않는다.
         if self.state.df is None:
             return
-        # 체크 안 된 항목 = 리포트에서 제외
+        # 체크 안 된 항목 = 안전 우선순위에서 제외
         preset.drop_columns = [cb.text() for cb in self.include_checks if not cb.isChecked()]
         preset.rules = [
             Rule(column=e["col"].currentText(), keyword=e["kw"].text(),
