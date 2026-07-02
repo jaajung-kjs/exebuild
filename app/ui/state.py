@@ -1,6 +1,7 @@
 """뷰 간 공유되는 런타임 상태."""
 
 from app.core.settings import Preset
+from app.core.columns import WORK_MONITOR_COLUMNS
 
 
 class AppState:
@@ -12,6 +13,7 @@ class AppState:
         self.target_date = None   # 추출에서 선택한 대상 날짜 (date)
 
     def columns(self) -> list:
+        # 다운로드 전에도 고정 컬럼 목록으로 설정을 구성할 수 있게 한다.
         if self.df is None:
-            return []
+            return list(WORK_MONITOR_COLUMNS)
         return list(self.df.columns)

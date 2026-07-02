@@ -86,8 +86,8 @@ tests/                   core·pipeline·downloader 스키마 단위 테스트
 
 ## Internal URLs (KEPCO Intranet Only)
 
-- Work Monitor: `http://work-monitor.kepco.co.kr`
-- BizMail: `http://bizmail.kepco.co.kr`
+- Work Monitor: `http://work-monitor.kepco.co.kr` (엑셀 다운로드; 서버 생성이 느려 다운로드 타임아웃 300초)
+- 웹메일(SSO): `http://mail.kepco.co.kr` (session/check → receiverCheck → uploadFile → send)
 - PowerGate WebSocket: `ws://127.0.0.1:21777`
 
 설정 저장 위치(런타임): `HKEY_CURRENT_USER\Software\KEPCO\점검리스트생성기` (레지스트리)

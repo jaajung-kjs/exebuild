@@ -1,13 +1,14 @@
 """
-BizMail sending module
+KEPCO 웹메일(mail.kepco.co.kr) 발송 모듈 — 로그인된 SSO 세션 기준.
 메일 설정(발신·수신·제목·본문)은 UI에서 편집한 값을 dict로 받아 발송한다.
+요청 구조는 브라우저 HAR(session/check → receiverCheck → uploadFile → send)과 동일.
 """
 
 import requests
 import os
 from datetime import datetime, timedelta
 import uuid
-from app.adapters.config import BIZMAIL_URL, HTTP_TIMEOUT
+from app.adapters.config import MAIL_URL, HTTP_TIMEOUT
 
 
 def generate_temp_key():
@@ -57,7 +58,7 @@ def upload_files(session, file_paths):
                 }
 
                 resp = session.post(
-                    f'{BIZMAIL_URL}/mail/json/uploadFile.do?_csrf=',
+                    f'{MAIL_URL}/mail/json/uploadFile.do',
                     files=files,
                     data=data,
                     timeout=HTTP_TIMEOUT
@@ -89,7 +90,7 @@ def send_bizmail(session, mail_config, attachment_paths=None, date_yymmdd=None, 
 
     Args:
         session (requests.Session): Authenticated session
-        mail_config (dict): Mail configuration from 분류표.xlsx sheet 2
+        mail_config (dict): UI에서 편집한 메일 설정
             {
                 'from_name': str,
                 'from_email': str,
@@ -115,8 +116,8 @@ def send_bizmail(session, mail_config, attachment_paths=None, date_yymmdd=None, 
         'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
         'Accept-Encoding': 'gzip, deflate',
         'Connection': 'keep-alive',
-        'Origin': BIZMAIL_URL,
-        'Referer': f'{BIZMAIL_URL}/mail/list.do',
+        'Origin': MAIL_URL,
+        'Referer': f'{MAIL_URL}/mail/list.do',
         'X-Requested-With': 'XMLHttpRequest',
     })
 
@@ -131,7 +132,7 @@ def send_bizmail(session, mail_config, attachment_paths=None, date_yymmdd=None, 
         # Step 1: Session validation
         print(f"\n  세션 확인 중...")
         timestamp = int(datetime.now().timestamp() * 1000)
-        session_url = f"{BIZMAIL_URL}/common/json/session/check.do?_={timestamp}"
+        session_url = f"{MAIL_URL}/common/json/session/check.do?_={timestamp}"
 
         session_resp = session.get(session_url, timeout=HTTP_TIMEOUT)
         session_data = session_resp.json()
@@ -158,8 +159,9 @@ def send_bizmail(session, mail_config, attachment_paths=None, date_yymmdd=None, 
         body_text = mail_config['body'].replace('{DATE}', date_yy_mm_dd)
 
         # Convert body to HTML format if not already
+        # (UI 리치텍스트는 <!DOCTYPE ...><html>… 형태이므로 이미 html이면 그대로 사용)
         body_html = body_text
-        if not body_html.strip().startswith('<html>'):
+        if '<html' not in body_html.lower():
             body_html = f"""<html><head><style type="text/css">
 p {{padding:0;margin:0;}}
 </style>
@@ -182,7 +184,7 @@ p {{padding:0;margin:0;}}
             receiver_data.append(('to', recipient))
 
         receiver_resp = session.post(
-            f"{BIZMAIL_URL}/mail/json/receiverCheck.do",
+            f"{MAIL_URL}/mail/json/receiverCheck.do",
             data=receiver_data,
             headers={'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
             timeout=HTTP_TIMEOUT
@@ -249,6 +251,8 @@ p {{padding:0;margin:0;}}
             # Approval
             ('approvalkey', ''),
             ('ap_send_type', '0'),
+            ('externalSend', '0'),
+            ('sendExternalMail', '0'),
             ('approver', ''),
             ('is_ap', '0'),
 
@@ -288,6 +292,7 @@ p {{padding:0;margin:0;}}
 
             # Approval report
             ('apUser', ''),
+            ('isManager', 'false'),
             ('apUserText', ''),
             ('_apReport', 'on'),
 
@@ -310,7 +315,7 @@ p {{padding:0;margin:0;}}
 
         # Send!
         send_resp = session.post(
-            f"{BIZMAIL_URL}/mail/json/send.do",
+            f"{MAIL_URL}/mail/json/send.do",
             data=send_data,
             headers={'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8'},
             timeout=HTTP_TIMEOUT
@@ -325,10 +330,11 @@ p {{padding:0;margin:0;}}
             print("=" * 60 + "\n")
             return {"success": True, "message": "발송 완료", "response": send_result}
         else:
-            print(f"\n  [실패] 발송 실패")
+            reason = send_result.get('send_result_txt') or send_result.get('send_result_txt_desc') or "발송 실패"
+            print(f"\n  [실패] {reason}")
             print(f"    응답: {send_result}")
             print("=" * 60 + "\n")
-            return {"success": False, "message": "발송 실패", "response": send_result}
+            return {"success": False, "message": str(reason), "response": send_result}
 
     except requests.exceptions.Timeout:
         print(f"\n  [실패] 타임아웃 ({HTTP_TIMEOUT}초 초과)")

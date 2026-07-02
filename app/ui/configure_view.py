@@ -78,6 +78,9 @@ class ConfigureView(QWidget):
         bottom.addWidget(self.save_btn)
         v.addLayout(bottom)
 
+        # 다운로드 전에도 고정 컬럼으로 설정 가능하게 초기 채움
+        self.populate_columns()
+
     # ---------- 카드 뼈대 ----------
     def _card(self, title, hint=None):
         card = QFrame(objectName="Card")
@@ -316,7 +319,8 @@ class ConfigureView(QWidget):
             btn.setStyleSheet(_SWATCH_QSS.format(c=c.name()))
 
     # ---------- 데이터 로드 / 프리셋 ----------
-    def load_dataframe(self):
+    def populate_columns(self):
+        """고정 컬럼(또는 다운로드된 컬럼)으로 설정 위젯을 채운다. 다운로드 전에도 동작."""
         cols = self.state.columns()
         self.include_list.clear()
         for c in cols:
@@ -335,15 +339,22 @@ class ConfigureView(QWidget):
         self.split_combo.addItem("나누지 않음", "")
         for c in cols:
             self.split_combo.addItem(f"{c} 별로", c)
+        self._fill_preview()
 
+    def load_dataframe(self):
+        self.populate_columns()
         self._clear_rows(self.rule_rows)
         self._clear_rows(self.filter_rows)
-        self._fill_preview()
         self.apply_preset(self.state.preset)
 
     def _fill_preview(self):
         df = self.state.df
+        cols = self.state.columns()
         if df is None:
+            # 다운로드 전 — 컬럼 헤더만 표시(행 없음)
+            self.preview.setColumnCount(len(cols))
+            self.preview.setHorizontalHeaderLabels(cols)
+            self.preview.setRowCount(0)
             return
         sample = df.head(PREVIEW_ROWS)
         self.preview.setColumnCount(len(sample.columns))

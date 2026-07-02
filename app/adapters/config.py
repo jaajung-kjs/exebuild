@@ -30,7 +30,7 @@ def get_output_dir():
 
 # Server URLs
 WORK_MONITOR_URL = "http://work-monitor.kepco.co.kr"
-BIZMAIL_URL = "http://bizmail.kepco.co.kr"
+MAIL_URL = "http://mail.kepco.co.kr"   # 로그인된 SSO 웹메일
 POWERGATE_WS_URI = "ws://127.0.0.1:21777"
 
 # Work Monitor settings
@@ -44,6 +44,8 @@ FILE_FORMAT = "xls"  # Server returns HTML format regardless
 # Timeouts
 WEBSOCKET_TIMEOUT = 10
 HTTP_TIMEOUT = 60
+# 엑셀 생성이 서버에서 20~60초(때론 그 이상) 걸리므로 다운로드는 넉넉히.
+DOWNLOAD_TIMEOUT = 300
 
 # Application info
 APP_NAME = "KEPCO RPA"

@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import pandas as pd
 from io import BytesIO
 from app.adapters.config import (
-    WORK_MONITOR_URL, HTTP_TIMEOUT,
+    WORK_MONITOR_URL, DOWNLOAD_TIMEOUT,
     PAGE, LIST_COUNT, DEPARTMENT_CODE
 )
 
@@ -60,11 +60,14 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None, departmen
 
     # safeRPA/excel_download.py 의 헤더를 그대로 사용 (검증된 동작 헤더)
     # Content-Type 은 세션이 아닌 POST 요청별로만 지정 → 세션 오염 방지
+    # 브라우저 HAR과 동일한 헤더 (검증된 동작 헤더)
+    # Content-Type 은 세션이 아닌 POST 요청별로만 지정 → 세션 오염 방지
     session.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7',
         'Accept-Language': 'ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7',
         'Accept-Encoding': 'gzip, deflate',
+        'Cache-Control': 'max-age=0',
         'Connection': 'keep-alive',
         'Origin': WORK_MONITOR_URL,
         'Referer': f'{WORK_MONITOR_URL}/WORK/DAYWORK/list.php',
@@ -99,7 +102,7 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None, departmen
             data=data,
             headers={'Content-Type': 'application/x-www-form-urlencoded'},
             stream=True,
-            timeout=HTTP_TIMEOUT
+            timeout=DOWNLOAD_TIMEOUT
         )
 
         if response.status_code == 200:
@@ -157,7 +160,7 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None, departmen
             return None
 
     except requests.exceptions.Timeout:
-        print(f"\n[실패] 타임아웃 ({HTTP_TIMEOUT}초 초과)")
+        print(f"\n[실패] 타임아웃 ({DOWNLOAD_TIMEOUT}초 초과)")
         return None
 
     except requests.exceptions.RequestException as e:
