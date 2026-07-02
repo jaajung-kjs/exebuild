@@ -84,8 +84,7 @@ class ExtractView(QWidget):
             sv.addWidget(c)
         sv.addWidget(QLabel(
             "· 2번을 끄면 원본 그대로 저장합니다.\n"
-            "· 설정은 ②·③ 탭에서 정하고 [설정 저장]하면 자동 저장·복원됩니다. "
-            "(설정이 없으면 실행 후 설정 화면으로 안내합니다.)",
+            "· 설정은 ②·③ 탭에서 정하고 [설정 저장]하면 자동 저장·복원됩니다.",
             objectName="Hint"))
         v.addWidget(steps)
 
@@ -151,26 +150,14 @@ class ExtractView(QWidget):
         self.state.session = session
         self.state.df = df
         self.btn.setEnabled(True)
-        self._append(f"✅ 불러오기 완료: {len(df)}행 × {len(df.columns)}열")
-        self.main.configure.load_dataframe()   # ②탭 미리보기·설정 위젯 채움
-
+        self._append(f"✅ 다운로드 완료: {len(df)}행 × {len(df.columns)}열")
         if not self._do_process:
             self._append("원본 그대로 저장합니다…")
             self._finish(self._save_raw())
             return
-        if self._has_config():
-            self.main.configure.write_into(self.state.preset)   # 최신 설정 반영
-            self._append("설정을 적용해 저장합니다…")
-            self._finish(self._save_processed())
-        else:
-            self._append("적용할 설정이 없습니다 → ②설정 탭에서 규칙을 만들고 "
-                         "[설정 저장] 후 다시 실행하세요.")
-            self.main.goto(1)
-
-    def _has_config(self):
-        p = self.state.preset
-        return bool(p.rules or p.filters or p.drop_columns or p.sheet_split_column
-                    or (p.sort and p.sort != "none"))
+        self.main.configure.write_into(self.state.preset)   # ②탭 설정 반영
+        self._append("설정을 적용해 저장합니다…")
+        self._finish(self._save_processed())
 
     # ---- 저장 실행 ----
     def _out_path(self, suffix):

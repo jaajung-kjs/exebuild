@@ -14,7 +14,5 @@ class AppState:
         self.target_date = None   # 추출에서 선택한 대상 날짜 (date)
 
     def columns(self) -> list:
-        # 다운로드 전에도 고정 컬럼 목록으로 설정을 구성할 수 있게 한다.
-        if self.df is None:
-            return list(WORK_MONITOR_COLUMNS)
-        return list(self.df.columns)
+        # 컬럼은 고정. 다운로드된 df와 무관하게 항상 같은 목록으로 설정을 구성한다.
+        return list(WORK_MONITOR_COLUMNS)

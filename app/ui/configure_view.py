@@ -4,16 +4,13 @@
 
 from PySide6.QtWidgets import (
     QWidget, QFrame, QScrollArea, QVBoxLayout, QHBoxLayout, QGridLayout, QLabel,
-    QPushButton, QCheckBox, QTableWidget, QTableWidgetItem,
-    QLineEdit, QColorDialog,
+    QPushButton, QCheckBox, QLineEdit, QColorDialog,
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
 from app.core.settings import Rule, Filter
 from app.ui.widgets import NoScrollComboBox
-
-PREVIEW_ROWS = 20
 
 # 화면에 보이는 쉬운 말 ↔ 엔진이 쓰는 값
 MATCH_OPTS = [("포함하면", "contains"), ("정확히 같으면", "equals")]
@@ -63,7 +60,6 @@ class ConfigureView(QWidget):
         b.addWidget(self._rules_card())
         b.addWidget(self._filters_card())
         b.addWidget(self._options_card())
-        b.addWidget(self._preview_card())
         b.addStretch(1)
         scroll.setWidget(body)
         v.addWidget(scroll, 1)
@@ -163,21 +159,6 @@ class ConfigureView(QWidget):
         right.addWidget(self.split_combo)
         row.addLayout(left); row.addLayout(right)
         lay.addLayout(row)
-        return card
-
-    def _preview_card(self):
-        card, lay = self._card(
-            "미리보기",
-            f"상위 {PREVIEW_ROWS}행만 표시합니다. 실제 생성은 전체 데이터에 적용됩니다.")
-        self.preview = QTableWidget(objectName="InnerTable")
-        self.preview.setFrameShape(QFrame.NoFrame)
-        self.preview.setAlternatingRowColors(True)
-        self.preview.verticalHeader().setVisible(False)
-        self.preview.setEditTriggers(QTableWidget.NoEditTriggers)
-        self.preview.setSelectionMode(QTableWidget.NoSelection)
-        self.preview.horizontalHeader().setStretchLastSection(True)
-        self.preview.setMinimumHeight(240)
-        lay.addWidget(self.preview)
         return card
 
     # ---------- 공통 위젯 ----------
@@ -349,30 +330,6 @@ class ConfigureView(QWidget):
         self.split_combo.addItem("나누지 않음", "")
         for c in cols:
             self.split_combo.addItem(f"{c} 별로", c)
-        self._fill_preview()
-
-    def load_dataframe(self):
-        self.populate_columns()
-        self._clear_rows(self.rule_rows)
-        self._clear_rows(self.filter_rows)
-        self.apply_preset(self.state.preset)
-
-    def _fill_preview(self):
-        df = self.state.df
-        cols = self.state.columns()
-        if df is None:
-            # 다운로드 전 — 컬럼 헤더만 표시(행 없음)
-            self.preview.setColumnCount(len(cols))
-            self.preview.setHorizontalHeaderLabels(cols)
-            self.preview.setRowCount(0)
-            return
-        sample = df.head(PREVIEW_ROWS)
-        self.preview.setColumnCount(len(sample.columns))
-        self.preview.setHorizontalHeaderLabels([str(c) for c in sample.columns])
-        self.preview.setRowCount(len(sample))
-        for r in range(len(sample)):
-            for c in range(len(sample.columns)):
-                self.preview.setItem(r, c, QTableWidgetItem(str(sample.iat[r, c])))
 
     def apply_preset(self, preset):
         cols = self.state.columns()
