@@ -45,3 +45,25 @@ def test_gives_up_after_max_retries():
         max_retries=4, sleep=lambda _: None,
     )
     assert session is None and out is None
+
+
+def test_download_called_with_department_code_not_date_to():
+    # 실제 downloader 시그니처를 흉내: (session, date_from=None, date_to=None, department_code=None)
+    seen = {}
+
+    def real_like_download(session, date_from=None, date_to=None, department_code=None):
+        seen["date_from"] = date_from
+        seen["date_to"] = date_to
+        seen["department_code"] = department_code
+        import pandas as pd
+        return pd.DataFrame({"a": [1], "b": [2]})
+
+    run_auth_and_download(
+        authenticate=lambda: "S",
+        download=real_like_download,
+        date_from="2025-03-01", department_code="4200",
+        sleep=lambda _: None,
+    )
+    assert seen["department_code"] == "4200"   # 본부 코드가 올바른 파라미터로 전달
+    assert seen["date_to"] is None             # date_to로 새어들어가면 안 됨
+    assert seen["date_from"] == "2025-03-01"

@@ -16,7 +16,7 @@ def run_auth_and_download(authenticate, download, *, date_from, department_code,
         session = authenticate()
         if session is None:
             continue
-        df = download(session, date_from, department_code)
+        df = download(session, date_from=date_from, department_code=department_code)
         if df is not None:
             return session, df
     return None, None
