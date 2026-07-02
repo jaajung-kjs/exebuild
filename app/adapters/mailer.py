@@ -7,7 +7,7 @@ import requests
 import os
 from datetime import datetime, timedelta
 import uuid
-from config import BIZMAIL_URL, HTTP_TIMEOUT
+from app.adapters.config import BIZMAIL_URL, HTTP_TIMEOUT
 
 
 def generate_temp_key():
@@ -62,11 +62,6 @@ def upload_files(session, file_paths):
                     data=data,
                     timeout=HTTP_TIMEOUT
                 )
-
-                print(f"    [DEBUG] 업로드 응답 status: {resp.status_code}")
-                print(f"    [DEBUG] 업로드 응답 headers: {dict(resp.headers)}")
-                print(f"    [DEBUG] 업로드 응답 body: {resp.text[:500]}")
-                print(f"    [DEBUG] 세션 쿠키: {dict(session.cookies)}")
 
                 result = resp.json()
 

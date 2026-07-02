@@ -10,6 +10,9 @@ lxml>=4.9.0
 # Optional (for legacy Excel format support)
 xlrd>=2.0.0
 
+# 개발/테스트
+pytest>=8.0.0
+
 # Note: Standard library modules used (no install needed)
 # - asyncio
 # - os
