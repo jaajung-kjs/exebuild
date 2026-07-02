@@ -77,23 +77,43 @@ class ConfigureView(QWidget):
         v.addLayout(btn_row)
 
     # ---- 섹션 위젯 ----
+    def _section_card(self, title):
+        """제목이 카드 안 상단에 들어가고 얇은 구분선이 있는 섹션 카드."""
+        card = QFrame(objectName="Card")
+        lay = QVBoxLayout(card)
+        lay.setContentsMargins(16, 14, 16, 16)
+        lay.setSpacing(10)
+        lay.addWidget(QLabel(title, objectName="CardTitle"))
+        lay.addWidget(QFrame(objectName="CardDivider"))
+        return card, lay
+
+    def _btn_row(self, add_text, add_slot, table):
+        row = QHBoxLayout()
+        row.setSpacing(8)
+        add = QPushButton(add_text, objectName="Ghost")
+        rm = QPushButton("－ 선택 삭제", objectName="Ghost")
+        add.clicked.connect(add_slot)
+        rm.clicked.connect(lambda: self._remove_row(table))
+        row.addWidget(add); row.addWidget(rm); row.addStretch(1)
+        return row
+
     def _drop_box(self):
-        box = QGroupBox("컬럼 Drop  ·  체크 시 제외")
-        lay = QVBoxLayout(box)
-        lay.setContentsMargins(10, 6, 10, 10)
+        card, lay = self._section_card("컬럼 Drop  ·  체크 시 제외")
         self.drop_list = QListWidget(objectName="DropList")
+        self.drop_list.setFrameShape(QFrame.NoFrame)
+        self.drop_list.setMinimumHeight(140)
         lay.addWidget(self.drop_list)
-        return box
+        return card
 
     def _rules_box(self):
-        box = QGroupBox("우선순위 규칙")
-        lay = QVBoxLayout(box)
-        lay.setContentsMargins(10, 6, 10, 10)
-        lay.setSpacing(8)
+        card, lay = self._section_card("우선순위 규칙")
         self.rules_table = QTableWidget(0, 5)
+        self.rules_table.setObjectName("InnerTable")
         self.rules_table.setHorizontalHeaderLabels(["열", "키워드", "매칭", "순위", "색"])
+        self.rules_table.setFrameShape(QFrame.NoFrame)
         self.rules_table.verticalHeader().setVisible(False)
         self.rules_table.setSelectionMode(QTableWidget.NoSelection)
+        self.rules_table.setMinimumHeight(140)
         rh = self.rules_table.horizontalHeader()
         rh.setSectionResizeMode(0, QHeaderView.Fixed)
         rh.setSectionResizeMode(1, QHeaderView.Stretch)
@@ -103,39 +123,25 @@ class ConfigureView(QWidget):
         for _c, _w in ((0, 92), (2, 98), (3, 58), (4, 44)):
             self.rules_table.setColumnWidth(_c, _w)
         lay.addWidget(self.rules_table)
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        add = QPushButton("＋ 규칙 추가", objectName="Ghost")
-        rm = QPushButton("－ 선택 삭제", objectName="Ghost")
-        add.clicked.connect(lambda: self._add_rule_row())
-        rm.clicked.connect(lambda: self._remove_row(self.rules_table))
-        row.addWidget(add); row.addWidget(rm); row.addStretch(1)
-        lay.addLayout(row)
-        return box
+        lay.addLayout(self._btn_row("＋ 규칙 추가", lambda: self._add_rule_row(), self.rules_table))
+        return card
 
     def _filters_box(self):
-        box = QGroupBox("필터  ·  모두 만족(AND)")
-        lay = QVBoxLayout(box)
-        lay.setContentsMargins(10, 6, 10, 10)
-        lay.setSpacing(8)
+        card, lay = self._section_card("필터  ·  모두 만족(AND)")
         self.filters_table = QTableWidget(0, 3)
+        self.filters_table.setObjectName("InnerTable")
         self.filters_table.setHorizontalHeaderLabels(["열", "연산", "값"])
+        self.filters_table.setFrameShape(QFrame.NoFrame)
         self.filters_table.verticalHeader().setVisible(False)
         self.filters_table.setSelectionMode(QTableWidget.NoSelection)
+        self.filters_table.setMinimumHeight(140)
         fh = self.filters_table.horizontalHeader()
         fh.setSectionResizeMode(0, QHeaderView.Stretch)
         fh.setSectionResizeMode(1, QHeaderView.ResizeToContents)
         fh.setSectionResizeMode(2, QHeaderView.Stretch)
         lay.addWidget(self.filters_table)
-        row = QHBoxLayout()
-        row.setSpacing(8)
-        add = QPushButton("＋ 필터 추가", objectName="Ghost")
-        rm = QPushButton("－ 선택 삭제", objectName="Ghost")
-        add.clicked.connect(lambda: self._add_filter_row())
-        rm.clicked.connect(lambda: self._remove_row(self.filters_table))
-        row.addWidget(add); row.addWidget(rm); row.addStretch(1)
-        lay.addLayout(row)
-        return box
+        lay.addLayout(self._btn_row("＋ 필터 추가", lambda: self._add_filter_row(), self.filters_table))
+        return card
 
     def _col_combo(self):
         c = QComboBox()

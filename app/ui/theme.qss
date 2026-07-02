@@ -92,22 +92,22 @@ QHeaderView::section {
 }
 QTableCornerButton::section { background: #F3F6FA; border: none; border-bottom: 1px solid #E2E7EF; }
 
-/* ---------- 체크리스트(컬럼 drop) ---------- */
-QListWidget#DropList {
-    background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 10px; padding: 4px;
+/* ---------- 카드 헤더(섹션 제목) ---------- */
+#CardTitle { font-size: 13px; font-weight: 800; color: #2B3A4E; }
+#CardDivider { background: #EAEEF4; max-height: 1px; min-height: 1px; border: none; }
+
+/* ---------- 카드 내부 표/리스트(테두리 없이 카드에 녹임) ---------- */
+QListWidget#DropList, QTableWidget#InnerTable {
+    background: transparent; border: none; alternate-background-color: #F8FAFD;
 }
 QListWidget#DropList::item { padding: 6px 8px; border-radius: 6px; }
 QListWidget#DropList::item:hover { background: #F1F5FC; }
-
-/* ---------- 그룹박스(설정 섹션) ---------- */
-QGroupBox {
-    background: #FFFFFF; border: 1px solid #E2E7EF; border-radius: 12px;
-    margin-top: 14px; padding: 16px 12px 12px 12px; font-weight: 800; color: #48566B;
+QListWidget#DropList::indicator {
+    width: 15px; height: 15px; border: 1px solid #B7C2D2; border-radius: 4px; background: #FFFFFF;
 }
-QGroupBox::title {
-    subcontrol-origin: margin; subcontrol-position: top left;
-    left: 14px; top: 2px; padding: 0 4px; color: #48566B; font-size: 12px;
-}
+QListWidget#DropList::indicator:hover { border-color: #2F6FED; }
+QListWidget#DropList::indicator:checked { background: #2F6FED; border-color: #2F6FED; }
+QTableWidget#InnerTable QHeaderView::section { background: #F6F8FB; }
 
 /* ---------- 상태 로그(콘솔) ---------- */
 #StatusLog {
