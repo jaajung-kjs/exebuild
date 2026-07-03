@@ -24,7 +24,7 @@ def is_valid_schema(df, min_columns: int = MIN_VALID_COLUMNS) -> bool:
 
 def download_excel_to_dataframe(session, date_from=None, date_to=None,
                                 department_code=None, on_status=None,
-                                schema_retries=3, retry_delay=2, sleep=None):
+                                schema_retries=5, retry_delay=2, sleep=None):
     """
     Download Excel from Work Monitor and return as DataFrame
 
