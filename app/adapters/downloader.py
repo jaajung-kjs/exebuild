@@ -23,7 +23,8 @@ def is_valid_schema(df, min_columns: int = MIN_VALID_COLUMNS) -> bool:
 
 
 def download_excel_to_dataframe(session, date_from=None, date_to=None,
-                                department_code=None, on_status=None):
+                                department_code=None, on_status=None,
+                                schema_retries=3, retry_delay=2, sleep=None):
     """
     Download Excel from Work Monitor and return as DataFrame
 
@@ -33,6 +34,11 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None,
         date_to (str): End date (YYYY-MM-DD)
         department_code (str): Department code
         on_status (callable): 진행/진단 메시지 콜백 (UI 로그 표시용)
+        schema_retries (int): 열 개수가 부족한(서버가 데이터 대신 오류/안내 페이지를 준)
+            응답을 받았을 때 같은 세션으로 재요청할 총 횟수. 서버측 일시적 문제일 때가
+            많아 재인증 없이 빠르게 다시 받는다.
+        retry_delay (int): 스키마 이상 재요청 사이 대기(초).
+        sleep (callable): 대기 함수(테스트 주입용, 기본 time.sleep).
 
     Returns:
         pandas.DataFrame: Downloaded data
@@ -80,83 +86,97 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None,
         'Upgrade-Insecure-Requests': '1',
     })
 
-    try:
-        print(f"\n[다운로드] 요청 중...")
+    print(f"\n[다운로드] 요청 중...")
 
-        # Request parameters from HAR
-        data = {
-            'page': str(PAGE),
-            'listCnt': str(LIST_COUNT),
-            'query_type': 'ALL',
-            'gubun1': '',
-            'gubun2': 'null',
-            'dateRange': date_range,
-            'selectOne': department_code,
-            'selectTwo': '',
-            'selectDept': '',
-            'keyword_gubun': '',
-            'keyword': '',
-            'stat_sel': '',
-            'cancel_sel': '',
-            'danger_sel': '',
-            'day_select': '2'
-        }
+    # Request parameters from HAR
+    data = {
+        'page': str(PAGE),
+        'listCnt': str(LIST_COUNT),
+        'query_type': 'ALL',
+        'gubun1': '',
+        'gubun2': 'null',
+        'dateRange': date_range,
+        'selectOne': department_code,
+        'selectTwo': '',
+        'selectDept': '',
+        'keyword_gubun': '',
+        'keyword': '',
+        'stat_sel': '',
+        'cancel_sel': '',
+        'danger_sel': '',
+        'day_select': '2'
+    }
 
-        # Download Excel (서버가 엑셀 생성에 수십 초~수 분 걸릴 수 있음)
-        s(f"서버에 요청({LIST_COUNT}건) — 응답 대기 중… (최대 {DOWNLOAD_TIMEOUT}초)")
-        t0 = time.monotonic()
-        response = session.post(
-            f'{WORK_MONITOR_URL}/WORK/DAYWORK/excel_extract.php',
-            data=data,
-            headers={'Content-Type': 'application/x-www-form-urlencoded'},
-            stream=True,
-            timeout=DOWNLOAD_TIMEOUT
-        )
-        body = response.content   # 여기서 전체 수신 완료까지 대기
-        elapsed = time.monotonic() - t0
-        ctype = response.headers.get('Content-Type', '')
-        s(f"응답 수신: {elapsed:.1f}초 · 상태 {response.status_code} · {len(body)}바이트 · {ctype}")
+    _sleep = sleep or time.sleep
 
-        if response.status_code != 200:
-            s(f"[실패] HTTP 오류 {response.status_code} — {response.text[:150]}")
-            return None
-        if len(body) == 0:
-            s("[실패] 빈 응답 — 해당 날짜에 데이터가 없을 수 있습니다.")
-            return None
-
-        first_bytes = body[:100]
-        is_html = b'<' in first_bytes or b'html' in first_bytes.lower()
+    # 열 개수가 부족한 응답(서버가 데이터 대신 오류/안내 페이지를 준 경우)은 서버측
+    # 일시적 문제일 때가 많다 → 같은 세션으로 빠르게 재요청(재인증 불필요).
+    for attempt in range(1, schema_retries + 1):
         try:
-            if is_html:
-                dfs = pd.read_html(BytesIO(body), encoding='euc-kr', header=0)
-                if not dfs:
-                    s("[실패] HTML에서 표를 찾지 못함")
-                    return None
-                df = dfs[0]
-            else:
-                df = pd.read_excel(BytesIO(body), engine='xlrd')
-        except Exception as e:  # noqa: BLE001
-            s(f"[실패] 응답 파싱 오류: {e} · 앞부분: {first_bytes[:60]!r}")
-            return None
+            # Download Excel (서버가 엑셀 생성에 수십 초~수 분 걸릴 수 있음)
+            s(f"서버에 요청({LIST_COUNT}건) — 응답 대기 중… (최대 {DOWNLOAD_TIMEOUT}초)")
+            t0 = time.monotonic()
+            response = session.post(
+                f'{WORK_MONITOR_URL}/WORK/DAYWORK/excel_extract.php',
+                data=data,
+                headers={'Content-Type': 'application/x-www-form-urlencoded'},
+                stream=True,
+                timeout=DOWNLOAD_TIMEOUT
+            )
+            body = response.content   # 여기서 전체 수신 완료까지 대기
+            elapsed = time.monotonic() - t0
+            ctype = response.headers.get('Content-Type', '')
+            s(f"응답 수신: {elapsed:.1f}초 · 상태 {response.status_code} · {len(body)}바이트 · {ctype}")
 
-        if not is_valid_schema(df):
+            if response.status_code != 200:
+                s(f"[실패] HTTP 오류 {response.status_code} — {response.text[:150]}")
+                return None
+            if len(body) == 0:
+                s("[실패] 빈 응답 — 해당 날짜에 데이터가 없을 수 있습니다.")
+                return None
+
+            first_bytes = body[:100]
+            is_html = b'<' in first_bytes or b'html' in first_bytes.lower()
+            try:
+                if is_html:
+                    dfs = pd.read_html(BytesIO(body), encoding='euc-kr', header=0)
+                    if not dfs:
+                        s("[실패] HTML에서 표를 찾지 못함")
+                        return None
+                    df = dfs[0]
+                else:
+                    df = pd.read_excel(BytesIO(body), engine='xlrd')
+            except Exception as e:  # noqa: BLE001
+                s(f"[실패] 응답 파싱 오류: {e} · 앞부분: {first_bytes[:60]!r}")
+                return None
+
+            if is_valid_schema(df):
+                s(f"[성공] {len(df)}행 × {len(df.columns)}열 ({elapsed:.1f}초)")
+                return df
+
+            # 열이 1개 등 스키마 이상 → 서버측 일시 문제로 보고 같은 세션으로 재요청
             first_value = str(df.iloc[0, 0]) if len(df) > 0 else ''
-            s(f"[실패] 예상과 다른 응답 (열 {len(df.columns)}개) — 내용: {first_value[:100]}")
+            s(f"[이상 응답] 열 {len(df.columns)}개 — 내용: {first_value[:80]}")
+            if attempt < schema_retries:
+                s(f"서버측 문제로 보고 재다운로드 {attempt + 1}/{schema_retries}… ({retry_delay}초 후)")
+                _sleep(retry_delay)
+                continue
+            s(f"[실패] {schema_retries}회 재요청에도 열 부족 — 데이터 없음 또는 서버/세션 문제")
             return None
 
-        s(f"[성공] {len(df)}행 × {len(df.columns)}열 ({elapsed:.1f}초)")
-        return df
+        except requests.exceptions.Timeout:
+            # 타임아웃은 서버가 아직 생성 중일 수 있어, 재요청 시 중복 생성 유발 → 재시도 안 함
+            s(f"[실패] 타임아웃 — 서버가 {DOWNLOAD_TIMEOUT}초 안에 응답하지 않음")
+            return None
 
-    except requests.exceptions.Timeout:
-        s(f"[실패] 타임아웃 — 서버가 {DOWNLOAD_TIMEOUT}초 안에 응답하지 않음")
-        return None
+        except requests.exceptions.RequestException as e:
+            s(f"[실패] 네트워크 오류: {e}")
+            return None
 
-    except requests.exceptions.RequestException as e:
-        s(f"[실패] 네트워크 오류: {e}")
-        return None
+        except Exception as e:
+            s(f"[실패] 예상치 못한 오류: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
-    except Exception as e:
-        s(f"[실패] 예상치 못한 오류: {e}")
-        import traceback
-        traceback.print_exc()
-        return None
+    return None
