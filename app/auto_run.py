@@ -52,7 +52,7 @@ def run_auto() -> int:
 
     session, df = run_auth_and_download(
         auth.authenticate, _dl, date_from=fmts["ymd"],
-        department_code=preset.department_code, max_retries=1)
+        department_code=preset.department_code, auth_attempts=3)
     if df is None:
         _log("자동 실행 실패: 인증 또는 다운로드 실패")
         return 1

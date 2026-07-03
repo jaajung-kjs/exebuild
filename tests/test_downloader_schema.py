@@ -1,6 +1,8 @@
 import pandas as pd
+import pytest
 import requests
 from app.adapters.downloader import is_valid_schema, download_excel_to_dataframe
+from app.core.pipeline import SchemaExhaustedError
 
 
 def test_single_column_is_invalid():
@@ -55,13 +57,14 @@ def test_retries_on_single_column_then_succeeds():
     assert len(slept) == 2        # 재요청 사이 대기 2회
 
 
-def test_gives_up_after_schema_retries():
+def test_raises_after_schema_retries_exhausted():
+    # 재요청을 다 써도 열 부족 → 재인증 신호(SchemaExhaustedError)
     sess = _Session([_Resp(BAD_HTML)] * 3)
-    df = download_excel_to_dataframe(
-        sess, date_from="2025-03-01", department_code="4200",
-        schema_retries=3, retry_delay=0, sleep=lambda _: None,
-    )
-    assert df is None
+    with pytest.raises(SchemaExhaustedError):
+        download_excel_to_dataframe(
+            sess, date_from="2025-03-01", department_code="4200",
+            schema_retries=3, retry_delay=0, sleep=lambda _: None,
+        )
     assert sess.calls == 3        # schema_retries 만큼만 재요청
 
 

@@ -12,6 +12,7 @@ from app.adapters.config import (
     WORK_MONITOR_URL, DOWNLOAD_TIMEOUT,
     PAGE, LIST_COUNT, DEPARTMENT_CODE
 )
+from app.core.pipeline import SchemaExhaustedError
 
 MIN_VALID_COLUMNS = 2
 
@@ -161,8 +162,13 @@ def download_excel_to_dataframe(session, date_from=None, date_to=None,
                 s(f"서버측 문제로 보고 재다운로드 {attempt + 1}/{schema_retries}… ({retry_delay}초 후)")
                 _sleep(retry_delay)
                 continue
-            s(f"[실패] {schema_retries}회 재요청에도 열 부족 — 데이터 없음 또는 서버/세션 문제")
-            return None
+            # 재요청을 다 써도 열 부족 → 세션 문제일 수 있으니 재인증하도록 신호를 올림
+            s(f"[실패] {schema_retries}회 재요청에도 열 부족 — 재인증 후 재시도 필요")
+            raise SchemaExhaustedError(
+                f"{schema_retries}회 재요청에도 열 {len(df.columns)}개")
+
+        except SchemaExhaustedError:
+            raise   # 재인증 신호는 pipeline으로 전파(아래 광범위 except가 삼키지 않게)
 
         except requests.exceptions.Timeout:
             # 타임아웃은 서버가 아직 생성 중일 수 있어, 재요청 시 중복 생성 유발 → 재시도 안 함

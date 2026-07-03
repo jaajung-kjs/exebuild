@@ -18,9 +18,9 @@ class DownloadWorker(QThread):
 
     def run(self):
         try:
-            # 인증은 1회(느린 엑셀 생성은 넉넉한 타임아웃으로 대기). 단, 서버가 데이터
-            # 대신 열 1개짜리 오류/안내 페이지를 주면 downloader가 같은 세션으로 빠르게
-            # 재요청한다(재인증 불필요 — 서버측 일시 문제 대응).
+            # 2단계 재시도: (1) 열 1개짜리 오류 응답이면 downloader가 같은 세션으로
+            # 빠르게 재요청(기본 5회). (2) 그래도 실패하면 pipeline이 재인증 후 재시도
+            # (총 3회). 느린 엑셀 생성은 넉넉한 타임아웃으로 대기.
             self.status.emit("인증 중…")
 
             def _download(session, date_from, department_code):
@@ -34,7 +34,7 @@ class DownloadWorker(QThread):
                 download=_download,
                 date_from=self._date_from,
                 department_code=self._dept,
-                max_retries=1,
+                auth_attempts=3,
             )
             if df is None:
                 self.failed.emit(

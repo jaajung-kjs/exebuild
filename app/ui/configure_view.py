@@ -354,10 +354,8 @@ class ConfigureView(QWidget):
         self._set_data(self.split_combo, preset.sheet_split_column or DEFAULT_SPLIT)
 
     def write_into(self, preset):
-        # 데이터 미로드 상태에서는 설정 위젯이 비어 있으므로,
-        # 기존 프리셋 값을 덮어쓰지 않도록 아무것도 기록하지 않는다.
-        if self.state.df is None:
-            return
+        # 열은 하드코딩(고정)이라 다운로드 없이도 위젯이 항상 채워져 있으므로
+        # 언제든 현재 설정을 프리셋에 기록한다.
         # 체크 안 된 항목 = 안전 우선순위에서 제외
         preset.drop_columns = [cb.text() for cb in self.include_checks if not cb.isChecked()]
         preset.rules = [
