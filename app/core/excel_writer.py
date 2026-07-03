@@ -2,8 +2,18 @@
 
 import pandas as pd
 from openpyxl.styles import Alignment, Font, PatternFill, Border, Side
+from openpyxl.utils import get_column_letter
 
 INTERNAL_COLOR_COL = "_row_color"
+
+MIN_COL_W = 8      # 최소 열 너비
+MAX_COL_W = 55     # 최대 열 너비(내용 긴 열도 이 이상은 안 늘림)
+ROW_HEIGHT = 19    # 균일 행 높이
+
+
+def _disp_len(v) -> int:
+    """표시 폭 추정 — 한글/CJK는 2칸, 그 외는 1칸."""
+    return sum(2 if ord(ch) >= 0x1100 else 1 for ch in str(v))
 
 
 def _safe_sheet_name(value: str) -> str:
@@ -20,10 +30,12 @@ def _hex(color: str) -> str:
 
 def _apply_format(ws, colors: list[str], n_cols: int):
     """한 시트에 서식 적용. colors[i]는 데이터 i번째 행(엑셀 i+2행)의 배경색 헥사."""
-    center = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    # 줄바꿈 없음 → 행 높이 균일. 헤더는 가운데, 데이터는 왼쪽 정렬(가독성).
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=False)
+    data_align = Alignment(horizontal="left", vertical="center", wrap_text=False)
     for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=n_cols):
         for cell in row:
-            cell.alignment = center
+            cell.alignment = header_align if cell.row == 1 else data_align
 
     bold = Font(bold=True)
     header_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
@@ -44,6 +56,22 @@ def _apply_format(ws, colors: list[str], n_cols: int):
     for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=n_cols):
         for cell in row:
             cell.border = border
+
+    # 열 너비 자동 조절 — 내용 길이(한글 폭 반영) 기준, 최소~최대 클램프
+    for col in range(1, n_cols + 1):
+        maxlen = 0
+        for row in range(1, ws.max_row + 1):
+            v = ws.cell(row=row, column=col).value
+            if v is not None:
+                dl = _disp_len(v)
+                if dl > maxlen:
+                    maxlen = dl
+        width = min(MAX_COL_W, max(MIN_COL_W, maxlen * 1.15 + 2))
+        ws.column_dimensions[get_column_letter(col)].width = width
+
+    # 행 높이 균일
+    for r in range(1, ws.max_row + 1):
+        ws.row_dimensions[r].height = ROW_HEIGHT
 
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
