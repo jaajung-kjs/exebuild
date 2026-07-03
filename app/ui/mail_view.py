@@ -44,7 +44,7 @@ class MailView(QWidget):
         self.from_email.setPlaceholderText("예: gwpower@kepco.co.kr")
         self.from_name = QLineEdit()
         self.from_name.setMinimumHeight(34)
-        self.from_name.setPlaceholderText("예: 강원본부 전자제어부")
+        self.from_name.setPlaceholderText("예: 김OO")
         self.recipients = QPlainTextEdit()
         self.recipients.setPlaceholderText("수신자 이메일 (줄바꿈으로 여러 명)")
         self.recipients.setFixedHeight(76)

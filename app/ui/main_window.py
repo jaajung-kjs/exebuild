@@ -35,6 +35,7 @@ class MainWindow(QMainWindow):
         self.nav.currentRowChanged.connect(self._nav_changed)
         sb.addWidget(self.nav)
         sb.addStretch(1)
+        sb.addWidget(QLabel("강원본부 전자제어부", objectName="Watermark"))
 
         # 본문 스택
         self.stack = QStackedWidget()
