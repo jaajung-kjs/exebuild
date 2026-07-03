@@ -56,13 +56,15 @@ def apply_drop(df: pd.DataFrame, drop_columns: list[str]) -> pd.DataFrame:
 
 
 def assign_priority(df: pd.DataFrame, rules: list[Rule]) -> pd.DataFrame:
-    """각 행에 규칙을 순차 적용(뒤 규칙이 우선). 매칭 없으면 3순위.
+    """각 행에 규칙 적용. 여러 규칙에 겹쳐 매칭되면 가장 중요한(번호가 작은)
+    순위가 이긴다(규칙 나열 순서와 무관). 같은 순위끼리 겹치면 먼저 나열된
+    규칙의 색을 쓴다. 매칭 없으면 3순위·무색.
     열 '점검순위'(라벨)와 내부 열 '_row_color'(헥사) 추가."""
     labels: list[str] = []
     colors: list[str] = []
     for _, row in df.iterrows():
-        priority = 3
-        color = ""
+        best_priority = None   # None = 아직 매칭 없음
+        best_color = ""
         for rule in rules:
             if rule.column not in df.columns:
                 continue
@@ -73,10 +75,16 @@ def assign_priority(df: pd.DataFrame, rules: list[Rule]) -> pd.DataFrame:
             else:  # contains
                 hit = rule.keyword in value
             if hit and rule.priority in PRIORITY_LABELS:
-                priority = rule.priority
-                color = rule.color
-        labels.append(PRIORITY_LABELS.get(priority, "3순위"))
-        colors.append(color)
+                # 더 중요한(번호가 작은) 순위만 채택. 동점이면 먼저 나온 규칙 유지.
+                if best_priority is None or rule.priority < best_priority:
+                    best_priority = rule.priority
+                    best_color = rule.color
+        if best_priority is None:
+            labels.append("3순위")
+            colors.append("")
+        else:
+            labels.append(PRIORITY_LABELS[best_priority])
+            colors.append(best_color)
     out = df.copy()
     out["점검순위"] = labels
     out["_row_color"] = colors

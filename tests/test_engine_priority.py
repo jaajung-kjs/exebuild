@@ -12,7 +12,7 @@ def _df():
     })
 
 
-def test_assign_priority_last_rule_wins_and_sets_color():
+def test_assign_priority_non_overlapping_rules():
     rules = [
         Rule(column="공사명", keyword="점검", match="contains", priority=2, color="#F7B9AF"),
         Rule(column="공사명", keyword="활선", match="contains", priority=1, color="#FFFF00"),
@@ -20,6 +20,30 @@ def test_assign_priority_last_rule_wins_and_sets_color():
     out = assign_priority(_df(), rules)
     assert list(out["점검순위"]) == ["1순위", "2순위", "3순위"]
     assert list(out["_row_color"]) == ["#FFFF00", "#F7B9AF", ""]
+
+
+def test_assign_priority_overlap_takes_most_important():
+    # 한 행이 1순위·2순위 규칙에 모두 매칭되면 더 중요한 1순위로 처리(그 규칙의 색)
+    df = pd.DataFrame({"공사명": ["활선 점검 작업"]})
+    rules = [
+        Rule(column="공사명", keyword="점검", match="contains", priority=2, color="#F7B9AF"),
+        Rule(column="공사명", keyword="활선", match="contains", priority=1, color="#FFFF00"),
+    ]
+    out = assign_priority(df, rules)
+    assert list(out["점검순위"]) == ["1순위"]
+    assert list(out["_row_color"]) == ["#FFFF00"]
+
+
+def test_assign_priority_overlap_is_order_independent():
+    # 규칙 순서를 뒤집어도 결과가 같아야 함(중요한 순위가 이김)
+    df = pd.DataFrame({"공사명": ["활선 점검 작업"]})
+    rules = [
+        Rule(column="공사명", keyword="활선", match="contains", priority=1, color="#FFFF00"),
+        Rule(column="공사명", keyword="점검", match="contains", priority=2, color="#F7B9AF"),
+    ]
+    out = assign_priority(df, rules)
+    assert list(out["점검순위"]) == ["1순위"]
+    assert list(out["_row_color"]) == ["#FFFF00"]
 
 
 def test_assign_priority_equals_match():
