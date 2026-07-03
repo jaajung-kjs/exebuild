@@ -7,8 +7,7 @@ from openpyxl.utils import get_column_letter
 INTERNAL_COLOR_COL = "_row_color"
 
 MIN_COL_W = 8      # 최소 열 너비
-MAX_COL_W = 55     # 최대 열 너비(내용 긴 열도 이 이상은 안 늘림)
-ROW_HEIGHT = 19    # 균일 행 높이
+MAX_COL_W = 55     # 최대 열 너비(이 이상은 안 늘리고 자동 줄바꿈)
 
 
 def _disp_len(v) -> int:
@@ -30,12 +29,11 @@ def _hex(color: str) -> str:
 
 def _apply_format(ws, colors: list[str], n_cols: int):
     """한 시트에 서식 적용. colors[i]는 데이터 i번째 행(엑셀 i+2행)의 배경색 헥사."""
-    # 줄바꿈 없음 → 행 높이 균일. 헤더는 가운데, 데이터는 왼쪽 정렬(가독성).
-    header_align = Alignment(horizontal="center", vertical="center", wrap_text=False)
-    data_align = Alignment(horizontal="left", vertical="center", wrap_text=False)
+    # 전체 가운데 정렬 + 자동 줄바꿈(열 최대너비 초과 시 줄바꿈, 행 높이는 Excel 자동)
+    center_wrap = Alignment(horizontal="center", vertical="center", wrap_text=True)
     for row in ws.iter_rows(min_row=1, max_row=ws.max_row, min_col=1, max_col=n_cols):
         for cell in row:
-            cell.alignment = header_align if cell.row == 1 else data_align
+            cell.alignment = center_wrap
 
     bold = Font(bold=True)
     header_fill = PatternFill(start_color="D3D3D3", end_color="D3D3D3", fill_type="solid")
@@ -68,10 +66,6 @@ def _apply_format(ws, colors: list[str], n_cols: int):
                     maxlen = dl
         width = min(MAX_COL_W, max(MIN_COL_W, maxlen * 1.15 + 2))
         ws.column_dimensions[get_column_letter(col)].width = width
-
-    # 행 높이 균일
-    for r in range(1, ws.max_row + 1):
-        ws.row_dimensions[r].height = ROW_HEIGHT
 
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
