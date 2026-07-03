@@ -27,6 +27,14 @@ def load_theme() -> str:
 
 
 def main():
+    from app.auto_run import is_auto_mode
+    if is_auto_mode():
+        # 무인 자동 실행 (GUI 없음) — QSettings 등을 위해 코어 앱만 생성
+        from PySide6.QtCore import QCoreApplication
+        from app.auto_run import run_auto
+        QCoreApplication(sys.argv)
+        sys.exit(run_auto())
+
     app = QApplication(sys.argv)
     # 플랫폼(특히 윈도우 네이티브 스타일)과 무관하게 QSS가 동일하게 적용되도록 고정
     app.setStyle("Fusion")

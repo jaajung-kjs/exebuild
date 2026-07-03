@@ -26,6 +26,8 @@ class Preset:
     default_date_offset: int = 1        # (구) 0=오늘, 1=내일 — date_mode로 대체
     date_mode: str = "tomorrow"         # "today" | "tomorrow" | "fixed"
     fixed_date: str = ""                # date_mode=="fixed"일 때 YYYY-MM-DD
+    do_process: bool = True             # ①실행 '2. 설정 적용해서 저장' 체크 상태
+    do_mail: bool = False               # ①실행 '3. 메일 발송' 체크 상태
     drop_columns: list[str] = field(default_factory=list)
     sheet_split_column: str = ""        # 지사 시트 분리 기준 열(헤더명)
     rules: list[Rule] = field(default_factory=list)

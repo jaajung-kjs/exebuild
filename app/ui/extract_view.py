@@ -95,7 +95,9 @@ class ExtractView(QWidget):
         c1.setEnabled(False)
         self.chk_process = QCheckBox("2. 설정(정렬·강조·필터) 적용해서 저장")
         self.chk_process.setChecked(True)
+        self.chk_process.toggled.connect(self._on_target_changed)
         self.chk_mail = QCheckBox("3. 메일 발송")
+        self.chk_mail.toggled.connect(self._on_target_changed)
         for c in (c1, self.chk_process, self.chk_mail):
             sv.addWidget(c)
         sv.addWidget(QLabel(
@@ -168,6 +170,8 @@ class ExtractView(QWidget):
         i = self.dept_combo.findData(preset.department_code)
         if i >= 0:
             self.dept_combo.setCurrentIndex(i)
+        self.chk_process.setChecked(getattr(preset, "do_process", True))
+        self.chk_mail.setChecked(getattr(preset, "do_mail", False))
         self._loading = False
 
     def write_into(self, preset):
@@ -178,6 +182,8 @@ class ExtractView(QWidget):
             d = self._target_date()
             preset.fixed_date = d.strftime("%Y-%m-%d")
         preset.default_date_offset = 0 if mode == "today" else 1
+        preset.do_process = self.chk_process.isChecked()
+        preset.do_mail = self.chk_mail.isChecked()
 
     # ---- 실행 ----
     def _run(self):

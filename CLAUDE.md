@@ -84,6 +84,13 @@ tests/                   core·pipeline·downloader 스키마 단위 테스트
 - **재시도**: `pipeline.run_auth_and_download`가 인증+다운로드를 최대 10회 재시도. 열 스키마
   이상(`downloader.is_valid_schema`)도 다운로드 실패로 보고 재시도.
 
+## 무인 자동 실행 (작업 스케줄러용)
+
+`app/auto_run.py`. EXE를 `--auto` 인자로 실행하거나 파일명에 `_auto`가 포함되면
+(예: `KEPCO_RPA_auto.exe`) GUI 없이 저장된 설정대로 다운로드→저장→(메일)을 1회
+수행하고 종료한다. 결과는 실행 파일 옆 `자동실행.log`에 기록. 종료코드 0=성공.
+실행 단계(가공 저장/메일)와 본부·날짜는 모두 프리셋(레지스트리)에서 읽는다.
+
 ## Internal URLs (KEPCO Intranet Only)
 
 - Work Monitor: `http://work-monitor.kepco.co.kr` (엑셀 다운로드; 서버 생성이 느려 다운로드 타임아웃 300초)
