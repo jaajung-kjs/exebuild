@@ -1,8 +1,9 @@
-"""③ 메일 설정 뷰 — 수신자·제목·본문(서식) 편집·저장.
+"""③ 메일 설정 뷰 — 발신자·수신자·제목·본문(서식) 편집·저장.
 
 설정 편집 전용. 실제 발송은 ①실행 화면에서 '3. 메일 발송'을 체크해 실행한다.
-발신자는 SSO 로그인된 사용자로 자동 지정된다. 본문은 굵기·글씨색·크기 서식을
-지원하는 리치텍스트(HTML)로 저장된다."""
+발신자(이메일·이름)는 메일 서버가 요청에 반드시 요구하는 값이라 여기서 직접
+지정한다(SSO 쿠키만으로는 발신주소가 채워지지 않음). 본문은 굵기·글씨색·크기
+서식을 지원하는 리치텍스트(HTML)로 저장된다."""
 
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QTextCharFormat, QFont, QColor
@@ -38,7 +39,12 @@ class MailView(QWidget):
         form.setSpacing(14)
         form.setLabelAlignment(Qt.AlignLeft | Qt.AlignVCenter)
 
-        sender_note = QLabel("현재 SSO 로그인된 사용자 메일로 자동 발송됩니다.", objectName="Hint")
+        self.from_email = QLineEdit()
+        self.from_email.setMinimumHeight(34)
+        self.from_email.setPlaceholderText("예: gwpower@kepco.co.kr")
+        self.from_name = QLineEdit()
+        self.from_name.setMinimumHeight(34)
+        self.from_name.setPlaceholderText("예: 강원본부 전자제어부")
         self.recipients = QPlainTextEdit()
         self.recipients.setPlaceholderText("수신자 이메일 (줄바꿈으로 여러 명)")
         self.recipients.setFixedHeight(76)
@@ -53,7 +59,8 @@ class MailView(QWidget):
         self.body.setAcceptRichText(True)
         body_box.addWidget(self.body)
 
-        form.addRow("발신자", sender_note)
+        form.addRow("발신 이메일", self.from_email)
+        form.addRow("발신자 이름", self.from_name)
         form.addRow("수신자", self.recipients)
         form.addRow("제목", self.subject)
         form.addRow("본문", body_box)
@@ -131,6 +138,8 @@ class MailView(QWidget):
 
     # ---------- 프리셋 연동 ----------
     def apply_preset(self, preset):
+        self.from_email.setText(preset.mail_from_email)
+        self.from_name.setText(preset.mail_from_name)
         self.recipients.setPlainText("\n".join(preset.mail_recipients))
         self.subject.setText(preset.mail_subject)
         body = preset.mail_body or ""
@@ -140,9 +149,8 @@ class MailView(QWidget):
             self.body.setPlainText(body)
 
     def write_into(self, preset):
-        # 발신자는 SSO 로그인 사용자 기준 → 서버가 채움
-        preset.mail_from_name = ""
-        preset.mail_from_email = ""
+        preset.mail_from_email = self.from_email.text().strip()
+        preset.mail_from_name = self.from_name.text().strip()
         preset.mail_recipients = [
             ln.strip() for ln in self.recipients.toPlainText().splitlines() if ln.strip()
         ]

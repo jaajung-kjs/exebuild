@@ -1,7 +1,8 @@
 """
 KEPCO 웹메일(mail.kepco.co.kr) 발송 모듈 — 로그인된 SSO 세션 기준.
 메일 설정(발신·수신·제목·본문)은 UI에서 편집한 값을 dict로 받아 발송한다.
-요청 구조는 브라우저 HAR(session/check → receiverCheck → uploadFile → send)과 동일.
+요청 구조는 브라우저 HAR(session/check → uploadFile → receiverCheck → send)과 동일.
+발신자(fromaddr/fromname)는 서버가 반드시 요구하는 값이라 mail_config로 받아 그대로 전송한다.
 """
 
 import requests
@@ -58,7 +59,7 @@ def upload_files(session, file_paths):
                 }
 
                 resp = session.post(
-                    f'{MAIL_URL}/mail/json/uploadFile.do',
+                    f'{MAIL_URL}/mail/json/uploadFile.do?_csrf=',
                     files=files,
                     data=data,
                     timeout=HTTP_TIMEOUT
@@ -108,6 +109,11 @@ def send_bizmail(session, mail_config, attachment_paths=None, date_yymmdd=None, 
     print("=" * 60)
     print("메일 전송")
     print("=" * 60)
+
+    # 발신자는 서버가 반드시 요구하는 값(빈 값이면 수신자 검증에서 권한 없음으로 실패).
+    if not (mail_config.get('from_email') or "").strip():
+        print("  [실패] 발신 이메일이 비어 있음 (③메일 설정에서 발신 이메일을 입력하세요)")
+        return {"success": False, "message": "발신 이메일이 설정되지 않았습니다. ③메일 설정에서 발신 이메일을 입력하세요."}
 
     # safeRPA/bizmail_send.py 의 헤더를 그대로 사용 (검증된 동작 헤더)
     session.headers.update({
@@ -174,6 +180,7 @@ p {{padding:0;margin:0;}}
             ('subject', subject),
             ('subjecthead', '-1'),
             ('content', body_html),
+            ('fromname', mail_config['from_name']),
             ('fromaddr', mail_config['from_email']),
             ('attach_size', str(attach_size)),
             ('attach_list', attach_list),
@@ -202,7 +209,6 @@ p {{padding:0;margin:0;}}
 
         # Generate temporary key
         temp_key = generate_temp_key()
-        secure_value = temp_key[:10]
         current_date = datetime.now().strftime("%Y-%m-%d")
 
         # Build send_data with multiple 'to' parameters (list of tuples)
@@ -218,9 +224,8 @@ p {{padding:0;margin:0;}}
             ('_tome', 'on'),
             ('_is_report', 'on'),
 
-            # Temporary key & security
+            # Temporary key
             ('tempKey', temp_key),
-            ('secureValue', secure_value),
             ('ukey', ''),
             ('first', '0'),
             ('tempsave', '0'),
@@ -251,10 +256,7 @@ p {{padding:0;margin:0;}}
             # Approval
             ('approvalkey', ''),
             ('ap_send_type', '0'),
-            ('externalSend', '0'),
-            ('sendExternalMail', '0'),
             ('approver', ''),
-            ('is_ap', '0'),
 
             # Options
             ('_is_each', 'on'),
@@ -292,7 +294,6 @@ p {{padding:0;margin:0;}}
 
             # Approval report
             ('apUser', ''),
-            ('isManager', 'false'),
             ('apUserText', ''),
             ('_apReport', 'on'),
 

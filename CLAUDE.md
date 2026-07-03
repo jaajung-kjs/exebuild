@@ -94,7 +94,7 @@ tests/                   core·pipeline·downloader 스키마 단위 테스트
 ## Internal URLs (KEPCO Intranet Only)
 
 - Work Monitor: `http://work-monitor.kepco.co.kr` (엑셀 다운로드; 서버 생성이 느려 다운로드 타임아웃 300초)
-- 웹메일(SSO): `http://mail.kepco.co.kr` (session/check → receiverCheck → uploadFile → send)
+- 웹메일(SSO): `http://mail.kepco.co.kr` (session/check → uploadFile → receiverCheck → send). **발신자(fromaddr/fromname)는 요청에 반드시 실어야 함** — SSO 쿠키만으로는 서버가 발신주소를 채우지 않으므로 ③메일 설정에서 직접 입력한다.
 - PowerGate WebSocket: `ws://127.0.0.1:21777`
 
 설정 저장 위치(런타임): `HKEY_CURRENT_USER\Software\KEPCO\점검리스트생성기` (레지스트리)
