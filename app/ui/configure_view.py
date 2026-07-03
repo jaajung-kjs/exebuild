@@ -323,7 +323,7 @@ class ConfigureView(QWidget):
 
         self.sort_combo.clear()
         self.sort_combo.addItem("정렬 안 함", "none")
-        self.sort_combo.addItem("중요도(우선순위)순", "priority")
+        self.sort_combo.addItem("점검순위 순 (1 → 2 → 3순위)", "priority")
         for c in cols:
             self.sort_combo.addItem(f"{c} 순", c)
 
