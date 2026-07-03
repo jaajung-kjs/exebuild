@@ -39,7 +39,7 @@ def main():
     with open(os.path.join(out_dir, "사용법.txt"), "w", encoding="utf-8") as f:
         f.write(USAGE)
 
-    print(f"base64 txt 생성 완료: {len(b64)/1024/1024:.1f}MB (텍스트)")
+    print(f"base64 txt created: {len(b64) / 1024 / 1024:.1f} MB (text)")
 
 
 if __name__ == "__main__":
