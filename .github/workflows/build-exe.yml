@@ -34,12 +34,26 @@ jobs:
       run: |
         dir dist
 
-    - name: Upload artifact
+    - name: Package EXE as base64 text (사내망 반입용)
+      run: |
+        python scripts/make_txt_package.py dist/KEPCO_RPA.exe dist/txt
+        dir dist\txt
+
+    - name: Upload artifact (EXE)
       uses: actions/upload-artifact@v4
       with:
         name: KEPCO_RPA_Windows
         path: |
           dist/KEPCO_RPA.exe
+        retention-days: 90
+
+    - name: Upload artifact (base64 txt — 사내망 반입용)
+      uses: actions/upload-artifact@v4
+      with:
+        name: KEPCO_RPA_txt
+        path: |
+          dist/txt/KEPCO_RPA.txt
+          dist/txt/사용법.txt
         retention-days: 90
 
     - name: Create Release (on tag)
