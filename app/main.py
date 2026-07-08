@@ -27,6 +27,10 @@ def load_theme() -> str:
 
 
 def main():
+    if "--diag-send-file" in sys.argv:
+        # 엑셀 첨부 + 다중/혼합 수신자 발송 테스트 (GUI 없음)
+        from app.diag_external import run_send_file_test
+        sys.exit(run_send_file_test(sys.argv))
     if "--diag-send-external" in sys.argv:
         # 사외메일 실제 발송 테스트 (GUI 없음)
         from app.diag_external import run_send_external_test

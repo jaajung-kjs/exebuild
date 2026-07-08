@@ -14,11 +14,16 @@ receiverCheck.do 를 외부 주소로 호출하고, 외부발송 허용 여부�
     → 서버는 외부수신자를 허용. 다음 단계는 '결재(승인) 필요 여부'와 실제 send.do 테스트.
 """
 
+import re
 import sys
-from datetime import datetime
+from datetime import date, datetime
 
-from app.adapters import auth, mailer
+from app.adapters import auth, downloader, mailer
 from app.adapters.config import MAIL_URL, HTTP_TIMEOUT
+from app.core.pipeline import run_auth_and_download
+from app.core.date_util import resolve_target_date, date_formats
+from app.core.excel_writer import write_excel
+from app.ui import config_store
 from app import app_paths
 
 
@@ -38,6 +43,11 @@ def _arg_value(argv, flag: str, default: str = "") -> str:
         if i + 1 < len(argv):
             return argv[i + 1]
     return default
+
+
+def _parse_recipients(raw: str) -> list:
+    """콤마·세미콜론·공백으로 구분된 수신자 문자열 → 리스트."""
+    return [p for p in re.split(r"[,;\s]+", (raw or "").strip()) if p]
 
 
 def _receiver_check(session, recipients, fromaddr):
@@ -192,5 +202,95 @@ def run_send_external_test(argv=None) -> int:
         _log("   도착함 = 사내 자동 외부발송 가능. 안 옴 = 게이트웨이에서 보류/차단(결재 등) 가능성.")
     else:
         _log("서버가 발송 실패로 응답 — 위 send_result_txt 메시지로 원인(결재/차단 등) 확인.")
+    _log("결과 파일: 사외메일진단.log (실행 파일과 같은 폴더)")
+    return 0 if res.get("success") else 1
+
+
+def run_send_file_test(argv=None) -> int:
+    """최종 목표 검증 — 엑셀을 기본 다운로드해 여러 수신자(사내·사외 혼합)에게 첨부 발송.
+
+        KEPCO_RPA.exe --diag-send-file --from 본인id@kepco.co.kr \
+            --to "a@kepco.co.kr, b@naver.com, c@kepco.co.kr"
+        (선택) --dept 4200 --date 2026-07-10 --subject "..." --body "..."
+
+    본부·날짜는 지정 안 하면 저장된 설정(프리셋)을 따른다. 가공 없이 원본 엑셀을
+    받아 첨부하고, send.do 응답을 출력한다. 수신자 각자 받은편지함 도착을 확인."""
+    argv = list(argv or sys.argv)
+    frm = _arg_value(argv, "--from")
+    recipients = _parse_recipients(_arg_value(argv, "--to"))
+
+    _log("=" * 56)
+    _log("파일 첨부 + 다중/혼합 수신자 발송 테스트")
+    _log(f"메일 서버: {MAIL_URL}")
+    if not frm:
+        _log("[중단] --from <본인 kepco 이메일> 이 필요합니다(발신주소).")
+        return 2
+    if not recipients:
+        _log('[중단] --to "a@kepco.co.kr, b@naver.com" 처럼 수신자를 지정하세요.')
+        return 2
+
+    preset = config_store.load_config()
+    dept = _arg_value(argv, "--dept") or preset.department_code
+    if not dept:
+        _log("[중단] 본부 코드가 없습니다. GUI에서 본부를 저장하거나 --dept 4200 처럼 지정하세요.")
+        return 2
+    date_str = _arg_value(argv, "--date")
+    if date_str:
+        fmts = date_formats(datetime.strptime(date_str, "%Y-%m-%d").date())
+    else:
+        d = resolve_target_date(preset.date_mode, preset.fixed_date, date.today())
+        fmts = date_formats(d)
+
+    ext_cnt = sum(1 for r in recipients if "@kepco.co.kr" not in r.lower())
+    _log(f"본부 {dept} / 대상일 {fmts['ymd']}")
+    _log(f"수신자 {len(recipients)}명 (사내 {len(recipients) - ext_cnt} · 사외 {ext_cnt}): {recipients}")
+
+    # 1) 기본 엑셀 다운로드(가공 없이 원본)
+    def _dl(session, date_from, department_code):
+        return downloader.download_excel_to_dataframe(
+            session, date_from=date_from, department_code=department_code, on_status=_log)
+
+    _log("엑셀 다운로드 중…")
+    session, df = run_auth_and_download(
+        auth.authenticate, _dl, date_from=fmts["ymd"], department_code=dept, auth_attempts=3)
+    if df is None:
+        _log("[실패] 인증 또는 다운로드 실패 — 첨부할 파일을 못 만들었습니다.")
+        return 1
+    out = str(app_paths.output_dir() / f"{fmts['yymmdd']} 외부발송 파일테스트(원본).xlsx")
+    try:
+        write_excel(df, out, "")
+    except (ValueError, OSError) as e:
+        _log(f"[실패] 엑셀 저장 오류: {e}")
+        return 1
+    _log(f"다운로드·저장 완료: {out} ({len(df)}행 × {len(df.columns)}열)")
+
+    # 2) 그 파일을 첨부해 다중/혼합 수신자에게 발송
+    stamp = datetime.now().strftime("%m-%d %H:%M:%S")
+    mail_config = {
+        "from_email": frm,
+        "from_name": _arg_value(argv, "--fromname", "외부발송 진단"),
+        "recipients": recipients,
+        "subject": _arg_value(argv, "--subject", f"[진단] 파일첨부 발송 테스트 {stamp}"),
+        "body": _arg_value(argv, "--body",
+                           f"엑셀 첨부 + 다중/혼합 수신자 발송 테스트입니다. ({stamp})"),
+    }
+    _log(f"발신: {mail_config['from_name']} <{frm}>")
+    _log(f"제목: {mail_config['subject']}")
+
+    res = mailer.send_mail(session, mail_config, attachment_paths=[out],
+                           date_yymmdd=fmts["yymmdd"], date_yy_mm_dd=fmts["yy_mm_dd"])
+    _log(f"send.do 결과: success={res.get('success')} / {res.get('message')}")
+    resp = res.get("response") or {}
+    for k in ["code", "send_result_txt", "send_result_txt_desc", "sent_mail_key", "save_mail_key"]:
+        if k in resp:
+            _log(f"    {k} = {resp.get(k)}")
+
+    _log("-" * 56)
+    if res.get("success"):
+        _log("서버는 발송 성공(code=1)으로 응답했습니다.")
+        _log("⇒ 수신자 각자(사내·사외) 받은편지함에서 엑셀 첨부가 실제로 왔는지 확인하세요.")
+        _log("   모두 도착 = 최종 목표(혼합 수신자 + 첨부 자동발송) 달성.")
+    else:
+        _log("서버가 발송 실패로 응답 — 위 send_result_txt 로 원인(첨부 용량/결재/차단 등) 확인.")
     _log("결과 파일: 사외메일진단.log (실행 파일과 같은 폴더)")
     return 0 if res.get("success") else 1
