@@ -27,19 +27,6 @@ def load_theme() -> str:
 
 
 def main():
-    if "--diag-send-file" in sys.argv:
-        # 엑셀 첨부 + 다중/혼합 수신자 발송 테스트 (GUI 없음)
-        from app.diag_external import run_send_file_test
-        sys.exit(run_send_file_test(sys.argv))
-    if "--diag-send-external" in sys.argv:
-        # 사외메일 실제 발송 테스트 (GUI 없음)
-        from app.diag_external import run_send_external_test
-        sys.exit(run_send_external_test(sys.argv))
-    if "--diag-external" in sys.argv:
-        # 사외메일 발송 가능 여부 진단 (GUI 없음)
-        from app.diag_external import run_external_diag
-        sys.exit(run_external_diag(sys.argv))
-
     from app.auto_run import is_auto_mode
     if is_auto_mode():
         # 무인 자동 실행 (GUI 없음) — QSettings 등을 위해 코어 앱만 생성
