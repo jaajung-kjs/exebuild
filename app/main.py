@@ -27,6 +27,10 @@ def load_theme() -> str:
 
 
 def main():
+    if "--diag-send-external" in sys.argv:
+        # 사외메일 실제 발송 테스트 (GUI 없음)
+        from app.diag_external import run_send_external_test
+        sys.exit(run_send_external_test(sys.argv))
     if "--diag-external" in sys.argv:
         # 사외메일 발송 가능 여부 진단 (GUI 없음)
         from app.diag_external import run_external_diag

@@ -17,7 +17,7 @@ receiverCheck.do 를 외부 주소로 호출하고, 외부발송 허용 여부�
 import sys
 from datetime import datetime
 
-from app.adapters import auth
+from app.adapters import auth, mailer
 from app.adapters.config import MAIL_URL, HTTP_TIMEOUT
 from app import app_paths
 
@@ -139,3 +139,58 @@ def run_external_diag(argv=None) -> int:
     _log("진단 종료 — permission / hasExternalReceiver / invalidReceiverList 값을 공유해 주세요.")
     _log("결과 파일: 사외메일진단.log (실행 파일과 같은 폴더)")
     return 0
+
+
+def run_send_external_test(argv=None) -> int:
+    """외부 주소로 실제 테스트 메일을 1통 발송한다(운영과 동일한 send_bizmail 경로).
+
+        KEPCO_RPA.exe --diag-send-external jaajung@naver.com --from 본인id@kepco.co.kr
+
+    send.do 응답(code/send_result_txt)을 출력하고, 외부 받은편지함 도착 여부를
+    사용자가 직접 확인하게 한다. 도착하면 사내에서 자동 외부발송이 가능하다는 확증."""
+    argv = list(argv or sys.argv)
+    ext = _arg_value(argv, "--diag-send-external")
+    frm = _arg_value(argv, "--from")
+
+    _log("=" * 56)
+    _log("사외(외부) 메일 실제 발송 테스트")
+    _log(f"메일 서버: {MAIL_URL}")
+    if not ext:
+        _log("[중단] 외부 이메일이 없습니다. 예) KEPCO_RPA.exe --diag-send-external hong@naver.com --from myid@kepco.co.kr")
+        return 2
+    if not frm:
+        _log("[중단] --from <본인 kepco 이메일> 이 필요합니다(발신주소).")
+        return 2
+
+    session = auth.authenticate()
+    if session is None:
+        _log("[실패] PowerGate 인증 실패 — PowerGate 실행/사내망 연결 확인")
+        return 1
+
+    stamp = datetime.now().strftime("%m-%d %H:%M:%S")
+    mail_config = {
+        "from_email": frm,
+        "from_name": _arg_value(argv, "--fromname", "외부발송 진단"),
+        "recipients": [ext],
+        "subject": f"[진단] 외부발송 테스트 {stamp}",
+        "body": f"사내망에서 보낸 외부발송 테스트입니다. ({stamp})",
+    }
+    _log(f"발신: {mail_config['from_name']} <{frm}>  →  수신: {ext}")
+    _log(f"제목: {mail_config['subject']}")
+
+    res = mailer.send_bizmail(session, mail_config, attachment_paths=[])
+    _log(f"send.do 결과: success={res.get('success')} / {res.get('message')}")
+    resp = res.get("response") or {}
+    for k in ["code", "send_result_txt", "send_result_txt_desc", "sent_mail_key", "save_mail_key"]:
+        if k in resp:
+            _log(f"    {k} = {resp.get(k)}")
+
+    _log("-" * 56)
+    if res.get("success"):
+        _log(f"서버는 발송 성공(code=1)으로 응답했습니다.")
+        _log(f"⇒ 이제 {ext} 받은편지함(스팸함 포함)에 실제로 도착했는지 꼭 확인하세요.")
+        _log("   도착함 = 사내 자동 외부발송 가능. 안 옴 = 게이트웨이에서 보류/차단(결재 등) 가능성.")
+    else:
+        _log("서버가 발송 실패로 응답 — 위 send_result_txt 메시지로 원인(결재/차단 등) 확인.")
+    _log("결과 파일: 사외메일진단.log (실행 파일과 같은 폴더)")
+    return 0 if res.get("success") else 1
