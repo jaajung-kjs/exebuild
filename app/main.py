@@ -27,6 +27,11 @@ def load_theme() -> str:
 
 
 def main():
+    if "--diag-external" in sys.argv:
+        # 사외메일 발송 가능 여부 진단 (GUI 없음)
+        from app.diag_external import run_external_diag
+        sys.exit(run_external_diag(sys.argv))
+
     from app.auto_run import is_auto_mode
     if is_auto_mode():
         # 무인 자동 실행 (GUI 없음) — QSettings 등을 위해 코어 앱만 생성
