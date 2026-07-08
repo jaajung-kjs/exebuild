@@ -1,4 +1,4 @@
-"""Preset의 메일 필드를 mailer.send_bizmail이 받는 dict로 변환 (순수)"""
+"""Preset의 메일 필드를 mailer.send_mail이 받는 dict로 변환 (순수)"""
 
 from app.core.settings import Preset
 

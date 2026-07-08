@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 KEPCO 공사현장 점검 우선순위 리스트 생성기. Work Monitor에서 점검 데이터를 내려받아
 사용자가 정한 규칙(강조·필터·정렬)으로 가공하고, 다중 시트 Excel로 저장하며, 선택적으로
-BizMail로 발송하는 **대화형 PySide6 데스크톱 앱**. 사내망 Windows용 단일 EXE로 배포된다.
+사내 웹메일(mail.kepco.co.kr)로 발송하는 **대화형 PySide6 데스크톱 앱**. 사내망 Windows용 단일 EXE로 배포된다.
 
 모든 UI 텍스트·주석·문서는 한국어.
 
@@ -51,7 +51,7 @@ app/
   adapters/  (사내망 연동, 기존 검증된 코드)
     auth.py              PowerGate WebSocket SSO → requests.Session
     downloader.py        Work Monitor HTTP → pandas.DataFrame (HTML/Excel 자동 감지)
-    mailer.py            BizMail REST 발송
+    mailer.py            사내 웹메일(mail.kepco.co.kr) REST 발송
     config.py            URL·타임아웃 상수, get_base_dir()/get_output_dir()
 tests/                   core·pipeline·downloader 스키마 단위 테스트
 ```
@@ -64,7 +64,7 @@ tests/                   core·pipeline·downloader 스키마 단위 테스트
    ├─ ② 미체크 → excel_writer.write_excel(원본)          → 원본 저장
    ├─ ② 체크  → engine.process(df, preset) → write_excel → 가공 저장
    │           (설정이 없으면 ②설정 화면으로 안내)
-   └─ ③ 체크  → MailWorker(mailer.send_bizmail)          → 메일 발송
+   └─ ③ 체크  → MailWorker(mailer.send_mail)             → 메일 발송
 ② 설정 / ③ 메일 = 설정 편집·저장 전용 ([설정 저장]만, 실행 버튼 없음)
 ```
 

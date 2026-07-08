@@ -142,7 +142,7 @@ def run_external_diag(argv=None) -> int:
 
 
 def run_send_external_test(argv=None) -> int:
-    """외부 주소로 실제 테스트 메일을 1통 발송한다(운영과 동일한 send_bizmail 경로).
+    """외부 주소로 실제 테스트 메일을 1통 발송한다(운영과 동일한 send_mail 경로).
 
         KEPCO_RPA.exe --diag-send-external jaajung@naver.com --from 본인id@kepco.co.kr
 
@@ -178,7 +178,7 @@ def run_send_external_test(argv=None) -> int:
     _log(f"발신: {mail_config['from_name']} <{frm}>  →  수신: {ext}")
     _log(f"제목: {mail_config['subject']}")
 
-    res = mailer.send_bizmail(session, mail_config, attachment_paths=[])
+    res = mailer.send_mail(session, mail_config, attachment_paths=[])
     _log(f"send.do 결과: success={res.get('success')} / {res.get('message')}")
     resp = res.get("response") or {}
     for k in ["code", "send_result_txt", "send_result_txt_desc", "sent_mail_key", "save_mail_key"]:

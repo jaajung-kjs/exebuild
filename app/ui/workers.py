@@ -65,7 +65,7 @@ class MailWorker(QThread):
     def run(self):
         try:
             self.status.emit("메일 전송 중…")
-            result = mailer.send_bizmail(
+            result = mailer.send_mail(
                 session=self._session,
                 mail_config=self._mail_config,
                 attachment_paths=[self._attachment] if self._attachment else [],

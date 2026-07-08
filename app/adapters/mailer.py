@@ -85,9 +85,9 @@ def upload_files(session, file_paths):
     return uploaded_files
 
 
-def send_bizmail(session, mail_config, attachment_paths=None, date_yymmdd=None, date_yy_mm_dd=None):
+def send_mail(session, mail_config, attachment_paths=None, date_yymmdd=None, date_yy_mm_dd=None):
     """
-    Send email via KEPCO BizMail system
+    KEPCO 웹메일(mail.kepco.co.kr)로 메일 발송
 
     Args:
         session (requests.Session): Authenticated session
@@ -115,7 +115,7 @@ def send_bizmail(session, mail_config, attachment_paths=None, date_yymmdd=None, 
         print("  [실패] 발신 이메일이 비어 있음 (③메일 설정에서 발신 이메일을 입력하세요)")
         return {"success": False, "message": "발신 이메일이 설정되지 않았습니다. ③메일 설정에서 발신 이메일을 입력하세요."}
 
-    # safeRPA/bizmail_send.py 의 헤더를 그대로 사용 (검증된 동작 헤더)
+    # 검증된 발송 스크립트의 헤더를 그대로 사용 (동작 확인된 헤더)
     session.headers.update({
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36',
         'Accept': 'application/json, text/javascript, */*; q=0.01',

@@ -73,7 +73,7 @@ def run_auto() -> int:
         mc = preset_to_mail_config(preset)
         if mc["recipients"]:
             _log("메일 발송 중…")
-            res = mailer.send_bizmail(session, mc, [out], fmts["yymmdd"], fmts["yy_mm_dd"])
+            res = mailer.send_mail(session, mc, [out], fmts["yymmdd"], fmts["yy_mm_dd"])
             _log("메일 발송 " + ("완료" if res.get("success") else f"실패: {res.get('message')}"))
         else:
             _log("메일 수신자가 없어 발송을 건너뜁니다.")
