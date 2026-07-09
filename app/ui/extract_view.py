@@ -19,6 +19,7 @@ from app.core.engine import process
 from app.core.excel_writer import write_excel
 from app.core.mail_config import preset_to_mail_config
 from app.core.date_util import date_formats
+from app.core.filename import resolve_filename
 from app import app_paths
 from app.ui.workers import DownloadWorker, MailWorker
 
@@ -242,7 +243,9 @@ class ExtractView(QWidget):
             self._append("❌ " + str(e))
             QMessageBox.critical(self, "저장 실패", str(e))
             return None
-        out = self._out_path("우선순위 리스트")
+        fmts = date_formats(self.state.target_date or date.today())
+        out = str(app_paths.output_dir() /
+                  resolve_filename(self.state.preset.filename_template, fmts["yymmdd"]))
         if self._write(processed, out, self.state.preset.sheet_split_column):
             self.state.output_path = out
             return out

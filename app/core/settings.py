@@ -34,6 +34,7 @@ class Preset:
     filters: list[Filter] = field(default_factory=list)
     filter_mode: str = "and"            # "and"(모두 만족) | "or"(하나라도 만족)
     sort: str = "none"                  # "none" | "priority" | "<열이름>"
+    filename_template: str = "{DATE} 공사현장 점검 우선순위 리스트"  # {DATE}=대상일(yymmdd)
     mail_from_name: str = ""
     mail_from_email: str = ""
     mail_recipients: list[str] = field(default_factory=list)

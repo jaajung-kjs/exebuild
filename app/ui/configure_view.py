@@ -160,6 +160,15 @@ class ConfigureView(QWidget):
         right.addWidget(self.split_combo)
         row.addLayout(left); row.addLayout(right)
         lay.addLayout(row)
+
+        lay.addWidget(QLabel("저장 파일명", objectName="FieldLabel"))
+        self.filename_edit = QLineEdit(); self.filename_edit.setMinimumHeight(34)
+        self.filename_edit.setPlaceholderText("{DATE} 공사현장 점검 우선순위 리스트")
+        lay.addWidget(self.filename_edit)
+        lay.addWidget(QLabel(
+            "{DATE}는 ①실행에서 선택한 대상 날짜로 바뀝니다(예: 260709). "
+            "확장자(.xlsx)는 자동으로 붙습니다. 비워두면 기본값을 씁니다.",
+            objectName="Hint"))
         return card
 
     # ---------- 공통 위젯 ----------
@@ -352,6 +361,7 @@ class ConfigureView(QWidget):
         self._set_data(self.sort_combo, preset.sort or "none")
         # 저장된 값이 없으면 기본으로 '2차사업소별로' 선택
         self._set_data(self.split_combo, preset.sheet_split_column or DEFAULT_SPLIT)
+        self.filename_edit.setText(preset.filename_template)
 
     def write_into(self, preset):
         # 열은 하드코딩(고정)이라 다운로드 없이도 위젯이 항상 채워져 있으므로
@@ -372,4 +382,5 @@ class ConfigureView(QWidget):
         preset.filter_mode = self.mode_combo.currentData() or "and"
         preset.sort = self.sort_combo.currentData() or "none"
         preset.sheet_split_column = self.split_combo.currentData() or ""
+        preset.filename_template = self.filename_edit.text().strip()
 

@@ -12,6 +12,7 @@ from app.core.pipeline import run_auth_and_download
 from app.core.engine import process
 from app.core.excel_writer import write_excel
 from app.core.date_util import resolve_target_date, date_formats
+from app.core.filename import resolve_filename
 from app.core.mail_config import preset_to_mail_config
 from app.adapters import auth, downloader, mailer
 from app import app_paths
@@ -59,7 +60,7 @@ def run_auto() -> int:
 
     try:
         if preset.do_process:
-            out = str(app_paths.output_dir() / f"{fmts['yymmdd']} 공사현장 점검 우선순위 리스트.xlsx")
+            out = str(app_paths.output_dir() / resolve_filename(preset.filename_template, fmts["yymmdd"]))
             write_excel(process(df, preset), out, preset.sheet_split_column)
         else:
             out = str(app_paths.output_dir() / f"{fmts['yymmdd']} 공사현장 점검 원본.xlsx")
