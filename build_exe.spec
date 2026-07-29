@@ -4,7 +4,12 @@ PyInstaller spec file for KEPCO RPA
 Build command: pyinstaller build_exe.spec
 """
 
+from PyInstaller.utils.hooks import collect_submodules
+
 block_cipher = None
+
+# holidays는 국가별 모듈을 동적 로딩 → 서브모듈을 명시적으로 수집해야 EXE에서 SouthKorea 사용 가능
+_holidays_submodules = collect_submodules('holidays')
 
 a = Analysis(
     ['app/main.py'],
@@ -23,6 +28,7 @@ a = Analysis(
         'openpyxl',
         'lxml',
         'xlrd',
+        *_holidays_submodules,
     ],
     hookspath=[],
     hooksconfig={},

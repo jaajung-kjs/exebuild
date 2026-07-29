@@ -6,7 +6,7 @@
 import os
 import subprocess
 import sys
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
@@ -18,7 +18,7 @@ from app.core import departments
 from app.core.engine import process
 from app.core.excel_writer import write_excel
 from app.core.mail_config import preset_to_mail_config
-from app.core.date_util import date_formats
+from app.core.date_util import date_formats, resolve_target_date
 from app.core.filename import resolve_filename
 from app import app_paths
 from app.ui.workers import DownloadWorker, MailWorker
@@ -55,6 +55,7 @@ class ExtractView(QWidget):
         self.date_mode.setMinimumHeight(34)
         self.date_mode.addItem("오늘", "today")
         self.date_mode.addItem("내일", "tomorrow")
+        self.date_mode.addItem("내일(주말·공휴일 제외)", "tomorrow_bizday")
         self.date_mode.addItem("특정 날짜", "fixed")
         self.date_mode.currentIndexChanged.connect(self._on_date_mode)
         self.date_mode.currentIndexChanged.connect(self._on_target_changed)
@@ -128,23 +129,22 @@ class ExtractView(QWidget):
         v.addStretch(1)
 
     def _on_date_mode(self):
-        """모드에 따라 날짜 선택기를 활성/비활성하고 오늘·내일이면 날짜를 맞춘다."""
+        """모드에 따라 날짜 선택기를 활성/비활성하고, 계산형 모드는 결과 날짜를 표시한다."""
         mode = self.date_mode.currentData()
         if mode == "fixed":
             self.date_edit.setEnabled(True)
         else:
+            # 오늘/내일/내일(영업일) — 계산된 대상일을 읽기전용으로 보여줌
             self.date_edit.setEnabled(False)
-            d = date.today() if mode == "today" else date.today() + timedelta(days=1)
+            d = resolve_target_date(mode, "", date.today())
             self.date_edit.setDate(QDate(d.year, d.month, d.day))
 
     def _target_date(self) -> date:
         mode = self.date_mode.currentData()
-        if mode == "today":
-            return date.today()
-        if mode == "tomorrow":
-            return date.today() + timedelta(days=1)
-        qd = self.date_edit.date()
-        return date(qd.year(), qd.month(), qd.day())
+        if mode == "fixed":
+            qd = self.date_edit.date()
+            return date(qd.year(), qd.month(), qd.day())
+        return resolve_target_date(mode, "", date.today())
 
     def _on_target_changed(self, *args):
         """본부·날짜가 바뀌면 즉시 자동 저장(레지스트리). 초기/적용 중엔 무시."""
