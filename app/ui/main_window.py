@@ -35,7 +35,11 @@ class MainWindow(QMainWindow):
         self.nav.currentRowChanged.connect(self._nav_changed)
         sb.addWidget(self.nav)
         sb.addStretch(1)
-        sb.addWidget(QLabel("강원본부 전자제어부", objectName="Watermark"))
+        # 둘째 줄 "강원본부"는 투명 처리 → 안전재난부가 전자제어부 아래에 정렬
+        sb.addWidget(QLabel(
+            "강원본부 전자제어부<br>"
+            "<span style='color:transparent'>강원본부 </span>안전재난부",
+            objectName="Watermark"))
 
         # 본문 스택
         self.stack = QStackedWidget()
