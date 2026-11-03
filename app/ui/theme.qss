@@ -58,6 +58,13 @@ QPushButton#Ghost {
 QPushButton#Ghost:hover { background: #F1F5FC; border-color: #A9C0E8; }
 QPushButton#Ghost:pressed { background: #E6EEFB; }
 
+/* 글자형 보조 버튼(강조 규칙의 '＋ 그리고 조건 추가') */
+QPushButton#LinkBtn {
+    background: transparent; color: #2F6FED; border: none;
+    padding: 2px 4px 2px 48px; font-weight: 600;
+}
+QPushButton#LinkBtn:hover { color: #1D4FB8; text-decoration: underline; }
+
 QPushButton#PresetBtn {
     background: rgba(255,255,255,0.08); color: #DDE7F5; border: 1px solid #2C517F;
     padding: 8px 10px; font-weight: 700;

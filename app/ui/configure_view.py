@@ -127,7 +127,7 @@ class ConfigureView(QWidget):
         card, lay = self._card(
             "② 중요한 행을 색으로 강조하기",
             "예: ‘공사명’에 ‘활선’이 포함되면 1순위로 노란색 표시. "
-            "조건을 함께 따지려면 ‘＋ 그리고’를 누르세요(예: ‘대분류’에 ‘배전’ 그리고 ‘작업내용’에 ‘활선’).")
+            "조건을 함께 따지려면 ‘＋ 그리고 조건 추가’를 누르세요(예: ‘대분류’에 ‘배전’ 그리고 ‘작업내용’에 ‘활선’).")
         self.rules_box = QVBoxLayout()
         self.rules_box.setSpacing(8)
         lay.addLayout(self.rules_box)
@@ -227,47 +227,70 @@ class ConfigureView(QWidget):
             self._set_data(match, cond.match)
         return col, kw, match
 
-    def _add_rule_row(self, rule: Rule = None):
-        frame = QFrame(objectName="SentenceRow")
-        outer = QVBoxLayout(frame)
-        outer.setContentsMargins(12, 8, 10, 8)
-        outer.setSpacing(6)
-        h = QHBoxLayout()
+    def _cond_line(self, lead, cond=None):
+        """조건 한 줄: (lead) [열]에 [단어]이(가) [매칭]. lead는 '그리고' 또는 빈칸."""
+        frame = QFrame(objectName="AndRow")
+        frame.setStyleSheet("QFrame#AndRow { background: transparent; }")
+        h = QHBoxLayout(frame)
+        h.setContentsMargins(0, 0, 0, 0)
         h.setSpacing(8)
-        col, kw, match = self._cond_widgets(rule)
-        prio = self._mapped_combo(PRIORITY_OPTS, 84)
-        color_btn = QPushButton("색"); color_btn.setFixedWidth(52); color_btn.setMinimumHeight(32)
-        color_btn.setProperty("hex", "#FFE14D")
-        color_btn.setStyleSheet(_SWATCH_QSS.format(c="#FFE14D"))
-        color_btn.clicked.connect(lambda _, bt=color_btn: self._pick_color(bt))
-        and_btn = QPushButton("＋ 그리고", objectName="Ghost")
-        and_btn.setMinimumHeight(32)
-        and_btn.setToolTip("이 규칙에 조건을 더 붙입니다(선택). 모든 조건을 만족해야 강조됩니다.")
-        rm = self._del_btn()
-
-        if rule:
-            self._set_data(prio, rule.priority)
-            color_btn.setProperty("hex", rule.color)
-            color_btn.setStyleSheet(_SWATCH_QSS.format(c=rule.color))
-
+        col, kw, match = self._cond_widgets(cond)
+        lead_lbl = self._conn(lead)
+        lead_lbl.setFixedWidth(40)   # 첫 줄(빈칸)과 '그리고' 줄의 열 위치를 맞춘다
+        h.addWidget(lead_lbl)
         h.addWidget(col)
         h.addWidget(self._conn("에"))
         h.addWidget(kw, 1)
         h.addWidget(self._conn("이(가)"))
         h.addWidget(match)
-        h.addWidget(self._conn("→"))
-        h.addWidget(prio)
-        h.addWidget(self._conn("· 행 색"))
-        h.addWidget(color_btn)
-        h.addWidget(and_btn)
-        h.addWidget(rm)
-        outer.addLayout(h)
+        return frame, h, {"frame": frame, "col": col, "kw": kw, "match": match}
+
+    def _add_rule_row(self, rule: Rule = None):
+        """규칙 한 개: 왼쪽에 조건 줄들(모두 만족), 오른쪽에 → 순위 · 색을 한 번만."""
+        frame = QFrame(objectName="SentenceRow")
+        outer = QHBoxLayout(frame)
+        outer.setContentsMargins(12, 8, 10, 8)
+        outer.setSpacing(10)
+
+        # 왼쪽: 조건 줄들 + '＋ 그리고'
+        conds = QVBoxLayout()
+        conds.setSpacing(6)
+        first, first_h, first_w = self._cond_line("", rule)
+        first_h.addSpacing(30 + first_h.spacing())   # '그리고' 줄의 ✕ 자리만큼 비워 칸을 맞춤
+        conds.addWidget(first)
         extras_box = QVBoxLayout()
         extras_box.setSpacing(6)
-        outer.addLayout(extras_box)
+        conds.addLayout(extras_box)
+        and_btn = QPushButton("＋ 그리고 조건 추가", objectName="LinkBtn")
+        and_btn.setCursor(Qt.PointingHandCursor)
+        and_btn.setToolTip("이 규칙에 조건을 더 붙입니다(선택). 모든 조건을 만족해야 강조됩니다.")
+        conds.addWidget(and_btn, alignment=Qt.AlignLeft)
+        outer.addLayout(conds, 1)
 
-        entry = {"frame": frame, "col": col, "kw": kw, "match": match,
-                 "prio": prio, "color": color_btn, "extras": [], "extras_box": extras_box}
+        # 오른쪽: 결과(순위·색) — 조건 전체에 대해 한 번
+        prio = self._mapped_combo(PRIORITY_OPTS, 84)
+        color_btn = QPushButton("색"); color_btn.setFixedWidth(52); color_btn.setMinimumHeight(32)
+        color_btn.setProperty("hex", "#FFE14D")
+        color_btn.setStyleSheet(_SWATCH_QSS.format(c="#FFE14D"))
+        color_btn.clicked.connect(lambda _, bt=color_btn: self._pick_color(bt))
+        rm = self._del_btn()
+        if rule:
+            self._set_data(prio, rule.priority)
+            color_btn.setProperty("hex", rule.color)
+            color_btn.setStyleSheet(_SWATCH_QSS.format(c=rule.color))
+        result = QHBoxLayout()
+        result.setSpacing(8)
+        result.addWidget(self._conn("→"))
+        result.addWidget(prio)
+        result.addWidget(self._conn("· 행 색"))
+        result.addWidget(color_btn)
+        result.addWidget(rm)
+        outer.addLayout(result)
+        outer.setAlignment(result, Qt.AlignVCenter)
+
+        entry = {"frame": frame, "col": first_w["col"], "kw": first_w["kw"],
+                 "match": first_w["match"], "prio": prio, "color": color_btn,
+                 "extras": [], "extras_box": extras_box}
         and_btn.clicked.connect(lambda: self._add_extra_cond(entry))
         rm.clicked.connect(lambda: self._remove_row(entry, self.rule_rows))
         if rule:
@@ -278,21 +301,10 @@ class ConfigureView(QWidget):
 
     def _add_extra_cond(self, entry, cond: Condition = None):
         """규칙에 '그리고' 조건 한 줄 추가."""
-        frame = QFrame(objectName="AndRow")
-        frame.setStyleSheet("QFrame#AndRow { background: transparent; }")
-        h = QHBoxLayout(frame)
-        h.setContentsMargins(0, 0, 0, 0)
-        h.setSpacing(8)
-        col, kw, match = self._cond_widgets(cond)
+        frame, h, sub = self._cond_line("그리고", cond)
         rm = self._del_btn()
-        h.addWidget(self._conn("그리고"))
-        h.addWidget(col)
-        h.addWidget(self._conn("에"))
-        h.addWidget(kw, 1)
-        h.addWidget(self._conn("이(가)"))
-        h.addWidget(match)
+        rm.setToolTip("이 조건 삭제")
         h.addWidget(rm)
-        sub = {"frame": frame, "col": col, "kw": kw, "match": match}
         rm.clicked.connect(lambda: self._remove_row(sub, entry["extras"]))
         entry["extras"].append(sub)
         entry["extras_box"].addWidget(frame)
