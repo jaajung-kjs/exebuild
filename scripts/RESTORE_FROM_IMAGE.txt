@@ -1,0 +1,17 @@
+[KEPCO_RPA.png 이미지 → KEPCO_RPA.exe 복원 방법 (사내망)]
+
+KEPCO_RPA.png 는 EXE의 바이트를 무손실 PNG 이미지로 담은 파일입니다.
+(PNG은 무손실이라 복원하면 원본 EXE와 100% 동일합니다.)
+
+복원하려면 사내망 PC에서 파이썬으로 아래 한 줄을 실행하세요.
+exe_image.py 와 KEPCO_RPA.png 를 같은 폴더에 두고:
+
+    python exe_image.py decode KEPCO_RPA.png KEPCO_RPA.exe
+
+→ KEPCO_RPA.exe 가 만들어집니다.
+
+- 외부 패키지(Pillow 등) 없이 파이썬 표준 라이브러리만으로 동작합니다.
+- 이미지 뷰어로 열면 알록달록한 점 그림처럼 보이는데 정상입니다.
+- 복원된 EXE가 원본과 같은지 확인하려면(선택):
+      certutil -hashfile KEPCO_RPA.exe SHA256
+  값이 빌드 로그의 해시와 같으면 정상입니다.

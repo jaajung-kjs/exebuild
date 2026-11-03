@@ -43,6 +43,20 @@ pyinstaller build_exe.spec      # → dist/KEPCO_RPA.exe
 
 `main` 브랜치에 푸시하면 GitHub Actions가 Windows EXE를 빌드해 아티팩트로 올린다.
 
+### 사내망 반입용 산출물
+
+사내 DRM/필터가 EXE 반입을 막는 경우를 위해, Actions가 EXE를 같은 바이트의 다른 형식으로도
+함께 올린다. 둘 다 무손실이라 복원하면 원본 EXE와 100% 동일하다.
+
+| 아티팩트 | 형식 | 사내망 복원 |
+|---|---|---|
+| `KEPCO_RPA_txt` | base64 텍스트 | `certutil -decode KEPCO_RPA.txt KEPCO_RPA.exe` (윈도우 기본) |
+| `KEPCO_RPA_image` | PNG 이미지 | `python exe_image.py decode KEPCO_RPA.png KEPCO_RPA.exe` (파이썬 표준 라이브러리만) |
+
+`scripts/exe_image.py` 는 EXE 바이트를 무손실 PNG 픽셀에 담고(`encode`) 되돌린다(`decode`).
+Pillow 등 외부 패키지 없이 동작하도록 표준 라이브러리(zlib)만 쓴다. 자세한 복원 방법은
+PNG 아티팩트에 함께 들어가는 `RESTORE_FROM_IMAGE.txt` 참고.
+
 ## 개발
 
 ```bash
