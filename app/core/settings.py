@@ -29,6 +29,7 @@ class Preset:
     do_process: bool = True             # ①실행 '2. 설정 적용해서 저장' 체크 상태
     do_mail: bool = False               # ①실행 '3. 메일 발송' 체크 상태
     drop_columns: list[str] = field(default_factory=list)
+    extract_high_risk_time: bool = False  # 안전대책의 'HH:MM ~ HH:MM' → '고위험 작업시간' 열
     sheet_split_column: str = ""        # 지사 시트 분리 기준 열(헤더명)
     rules: list[Rule] = field(default_factory=list)
     filters: list[Filter] = field(default_factory=list)

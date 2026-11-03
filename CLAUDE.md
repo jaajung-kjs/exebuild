@@ -41,7 +41,8 @@ app/
     state.py             AppState (df·session·preset·target_date)
     theme.qss            테마
   core/  (순수 로직 — Qt/네트워크 의존 없음)
-    engine.py            df + Preset → 가공 df (필터·강조·drop·정렬)
+    engine.py            df + Preset → 가공 df (고위험시간 추출·필터·강조·drop·정렬)
+    high_risk.py         안전대책의 시간 표현 → 표준형('09:00 ~ 11:00') '고위험 작업시간' 열(옵션)
     excel_writer.py      가공 df → 지사별 다중 시트 서식 xlsx
     settings.py          Preset/Rule/Filter 데이터클래스 (+ to_dict/from_dict)
     departments.py       본부 29개 ↔ 부서코드 매핑
@@ -78,6 +79,10 @@ tests/                   core·pipeline·downloader 스키마 단위 테스트
 - **강조 규칙 있을 때만** 결과에 "점검순위" 열 추가(+행 색). 규칙 없으면 원본 유지.
 - **범용 규칙 엔진**: `[열] + 키워드 + 매칭(contains/equals) → 순위 + 색`. 필터는 열별 조건
   (not_null/is_empty/contains/equals/not_equals/starts_with/ends_with/in_list) + AND/OR 결합.
+- **고위험 작업시간(옵션, 경남본부 요청)**: ②설정의 추가 체크박스(`extract_high_risk_time`,
+  기본 해제)를 켜면 가공 단계 맨 앞에서 안전대책의 시간 표현(양식 자유, 라벨 무관)을
+  표준형으로 바꿔 '안전대책' 오른쪽 새 열로 옮기고 안전대책에서는 지운다. 지원 표기·제외
+  대상은 `high_risk.py` 모듈 docstring과 `tests/test_high_risk.py` 케이스 표 참고.
 - **열은 헤더명으로 매칭**(열 문자 아님) → Work Monitor 열 순서 변경에 강함.
 - **중복 헤더 방어**: `engine.process`는 중복 열 이름이 있으면 `ValueError`(호출부에서 안내).
 - **QThread 워커**: 인증·다운로드·메일은 워커에서 실행, 시그널로 UI에 상태 전달.

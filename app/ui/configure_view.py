@@ -10,6 +10,7 @@ from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
 from app.core.settings import Rule, Filter
+from app.core.high_risk import HIGH_RISK_COL
 from app.ui.widgets import NoScrollComboBox
 
 # 화면에 보이는 쉬운 말 ↔ 엔진이 쓰는 값
@@ -112,6 +113,14 @@ class ConfigureView(QWidget):
         self.include_grid.setHorizontalSpacing(18)
         self.include_grid.setVerticalSpacing(7)
         lay.addLayout(self.include_grid)
+        # 추가 항목 — 원본에 없는 열이라 기본 해제, '전체 선택/해제'의 영향도 받지 않는다
+        lay.addWidget(QFrame(objectName="CardDivider"))
+        self.high_risk_check = QCheckBox(f"{HIGH_RISK_COL} (안전대책에서 추출)")
+        lay.addWidget(self.high_risk_check)
+        lay.addWidget(QLabel(
+            "안전대책에 적힌 시간(9시~11시, 오후 2시, 0900-1100 등)을 ‘09:00 ~ 11:00’ 형식으로 맞춰 "
+            "새 열로 옮기고, 안전대책에서는 지웁니다.",
+            objectName="Hint"))
         return card
 
     def _rules_card(self):
@@ -176,7 +185,7 @@ class ConfigureView(QWidget):
         c = NoScrollComboBox()
         c.setMinimumHeight(32)
         c.setMinimumWidth(130)
-        c.addItems(self.state.columns())
+        c.addItems(self.state.columns() + [HIGH_RISK_COL])
         return c
 
     def _mapped_combo(self, opts, width=130):
@@ -333,7 +342,7 @@ class ConfigureView(QWidget):
         self.sort_combo.clear()
         self.sort_combo.addItem("정렬 안 함", "none")
         self.sort_combo.addItem("점검순위 순 (1 → 2 → 3순위)", "priority")
-        for c in cols:
+        for c in cols + [HIGH_RISK_COL]:
             self.sort_combo.addItem(f"{c} 순", c)
 
         self.split_combo.clear()
@@ -349,6 +358,7 @@ class ConfigureView(QWidget):
         # 포함 체크: 제외 목록(drop_columns)에 없으면 체크
         for cb in self.include_checks:
             cb.setChecked(cb.text() not in preset.drop_columns)
+        self.high_risk_check.setChecked(preset.extract_high_risk_time)
         # 규칙·필터 재구성
         self._clear_rows(self.rule_rows)
         for rule in preset.rules:
@@ -368,6 +378,7 @@ class ConfigureView(QWidget):
         # 언제든 현재 설정을 프리셋에 기록한다.
         # 체크 안 된 항목 = 안전 우선순위에서 제외
         preset.drop_columns = [cb.text() for cb in self.include_checks if not cb.isChecked()]
+        preset.extract_high_risk_time = self.high_risk_check.isChecked()
         preset.rules = [
             Rule(column=e["col"].currentText(), keyword=e["kw"].text(),
                  match=e["match"].currentData(), priority=e["prio"].currentData(),
