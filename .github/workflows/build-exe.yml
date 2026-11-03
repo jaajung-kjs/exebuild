@@ -56,6 +56,24 @@ jobs:
           dist/txt/사용법.txt
         retention-days: 90
 
+    - name: Package EXE as PNG image (사내망 반입용)
+      run: |
+        python scripts/exe_image.py encode dist/KEPCO_RPA.exe dist/KEPCO_RPA.png
+        Copy-Item scripts/RESTORE_FROM_IMAGE.txt dist/RESTORE_FROM_IMAGE.txt
+        Copy-Item scripts/exe_image.py dist/exe_image.py
+        dir dist
+      shell: pwsh
+
+    - name: Upload artifact (PNG image — 사내망 반입용)
+      uses: actions/upload-artifact@v4
+      with:
+        name: KEPCO_RPA_image
+        path: |
+          dist/KEPCO_RPA.png
+          dist/exe_image.py
+          dist/RESTORE_FROM_IMAGE.txt
+        retention-days: 90
+
     - name: Create Release (on tag)
       if: startsWith(github.ref, 'refs/tags/')
       uses: softprops/action-gh-release@v1
