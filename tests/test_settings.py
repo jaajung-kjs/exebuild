@@ -37,3 +37,20 @@ def test_from_dict_tolerates_missing_optionals():
     assert p.name == "x"
     assert p.rules == []
     assert p.mail_recipients == []
+
+
+def test_roundtrip_rule_with_extra_conditions():
+    from app.core.settings import Condition
+    p = Preset(name="x", department_code="4200", rules=[
+        Rule(column="대분류", keyword="배전", match="equals", priority=1, color="#FFFF00",
+             extra_conditions=[Condition(column="공사명", keyword="활선", match="contains")])])
+    p2 = Preset.from_dict(p.to_dict())
+    assert p2 == p
+    assert isinstance(p2.rules[0].extra_conditions[0], Condition)
+
+
+def test_old_saved_rule_without_extra_conditions_loads():
+    # 이전 버전이 저장한 규칙(extra_conditions 키 없음)도 그대로 읽힌다
+    p = Preset.from_dict({"name": "x", "department_code": "4200", "rules": [
+        {"column": "공사명", "keyword": "활선", "match": "contains", "priority": 1, "color": "#FFFF00"}]})
+    assert p.rules[0].extra_conditions == []

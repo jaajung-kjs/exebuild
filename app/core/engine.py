@@ -56,10 +56,30 @@ def apply_drop(df: pd.DataFrame, drop_columns: list[str]) -> pd.DataFrame:
     return df.drop(columns=drop_columns, errors="ignore")
 
 
+def _cond_hit(row, columns, column: str, keyword: str, match: str) -> bool:
+    """행 하나가 조건(열·키워드·매칭)을 만족하는지. 없는 열이면 불일치."""
+    if column not in columns:
+        return False
+    value = row[column]
+    value = "" if pd.isna(value) else str(value)
+    if match == "equals":
+        return value == keyword
+    return keyword in value   # contains
+
+
+def _rule_hit(row, columns, rule: Rule) -> bool:
+    """첫 조건과 '그리고' 조건을 모두 만족해야 매칭."""
+    if not _cond_hit(row, columns, rule.column, rule.keyword, rule.match):
+        return False
+    return all(_cond_hit(row, columns, c.column, c.keyword, c.match)
+               for c in rule.extra_conditions)
+
+
 def assign_priority(df: pd.DataFrame, rules: list[Rule]) -> pd.DataFrame:
     """각 행에 규칙 적용. 여러 규칙에 겹쳐 매칭되면 가장 중요한(번호가 작은)
     순위가 이긴다(규칙 나열 순서와 무관). 같은 순위끼리 겹치면 먼저 나열된
     규칙의 색을 쓴다. 매칭 없으면 3순위·무색.
+    규칙에 '그리고' 조건(extra_conditions)이 있으면 모두 만족해야 매칭.
     열 '점검순위'(라벨)와 내부 열 '_row_color'(헥사) 추가."""
     labels: list[str] = []
     colors: list[str] = []
@@ -67,15 +87,7 @@ def assign_priority(df: pd.DataFrame, rules: list[Rule]) -> pd.DataFrame:
         best_priority = None   # None = 아직 매칭 없음
         best_color = ""
         for rule in rules:
-            if rule.column not in df.columns:
-                continue
-            value = row[rule.column]
-            value = "" if pd.isna(value) else str(value)
-            if rule.match == "equals":
-                hit = value == rule.keyword
-            else:  # contains
-                hit = rule.keyword in value
-            if hit and rule.priority in PRIORITY_LABELS:
+            if _rule_hit(row, df.columns, rule) and rule.priority in PRIORITY_LABELS:
                 # 더 중요한(번호가 작은) 순위만 채택. 동점이면 먼저 나온 규칙 유지.
                 if best_priority is None or rule.priority < best_priority:
                     best_priority = rule.priority

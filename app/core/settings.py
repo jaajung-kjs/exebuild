@@ -4,12 +4,28 @@ from dataclasses import dataclass, field, asdict
 
 
 @dataclass
+class Condition:
+    """강조 규칙에 덧붙이는 '그리고' 조건 하나."""
+    column: str
+    keyword: str
+    match: str = "contains"   # "contains" | "equals"
+
+
+@dataclass
 class Rule:
     column: str
     keyword: str
     match: str = "contains"   # "contains" | "equals"
     priority: int = 3         # 1 | 2 | 3
     color: str = "#FFFFFF"    # 해당 순위 행 배경색 (헥사)
+    # 선택: 첫 조건과 함께 모두 만족해야 하는 추가 조건(비어 있으면 단일 조건 규칙)
+    extra_conditions: list[Condition] = field(default_factory=list)
+
+    @classmethod
+    def from_dict(cls, d: dict) -> "Rule":
+        data = dict(d)
+        data["extra_conditions"] = [Condition(**c) for c in data.get("extra_conditions", [])]
+        return cls(**data)
 
 
 @dataclass
@@ -48,7 +64,7 @@ class Preset:
     @classmethod
     def from_dict(cls, d: dict) -> "Preset":
         data = dict(d)
-        data["rules"] = [Rule(**r) for r in data.get("rules", [])]
+        data["rules"] = [Rule.from_dict(r) for r in data.get("rules", [])]
         data["filters"] = [Filter(**f) for f in data.get("filters", [])]
         # 알 수 없는 키는 무시하고 정의된 필드만 사용
         known = cls.__dataclass_fields__.keys()

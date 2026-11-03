@@ -120,3 +120,47 @@ def test_process_applies_filter_priority_drop_sort():
     assert "점검순위" in out.columns
     assert out.iloc[0]["점검순위"] == "1순위"     # priority 정렬로 활선 행이 맨 위
     assert list(out.columns).count("_row_color") == 1
+
+
+# ---------- '그리고' 조건(규칙 하나에 여러 조건) ----------
+from app.core.settings import Condition
+
+
+def _df_div():
+    return pd.DataFrame({
+        "대분류": ["배전", "송전", "배전", "송전"],
+        "공사명": ["활선 작업", "활선 작업", "일반 보수", "철탑 도장"],
+    })
+
+
+def test_rule_without_extra_conditions_works_as_before():
+    rules = [Rule(column="공사명", keyword="활선", priority=1, color="#FFFF00")]
+    out = assign_priority(_df_div(), rules)
+    assert list(out["점검순위"]) == ["1순위", "1순위", "3순위", "3순위"]
+
+
+def test_extra_condition_requires_all_to_match():
+    # 대분류=배전 그리고 공사명에 '활선' → 1순위 (송전 활선은 제외)
+    rules = [Rule(column="대분류", keyword="배전", match="equals", priority=1, color="#FFFF00",
+                  extra_conditions=[Condition(column="공사명", keyword="활선")])]
+    out = assign_priority(_df_div(), rules)
+    assert list(out["점검순위"]) == ["1순위", "3순위", "3순위", "3순위"]
+
+
+def test_different_rules_per_division():
+    rules = [
+        Rule(column="대분류", keyword="배전", match="equals", priority=1, color="#FFFF00",
+             extra_conditions=[Condition(column="공사명", keyword="활선")]),
+        Rule(column="대분류", keyword="송전", match="equals", priority=1, color="#F7B9AF",
+             extra_conditions=[Condition(column="공사명", keyword="철탑")]),
+    ]
+    out = assign_priority(_df_div(), rules)
+    assert list(out["점검순위"]) == ["1순위", "3순위", "3순위", "1순위"]
+    assert list(out["_row_color"]) == ["#FFFF00", "", "", "#F7B9AF"]
+
+
+def test_extra_condition_on_missing_column_never_matches():
+    rules = [Rule(column="대분류", keyword="배전", match="equals", priority=1, color="#FFFF00",
+                  extra_conditions=[Condition(column="없는열", keyword="x")])]
+    out = assign_priority(_df_div(), rules)
+    assert list(out["점검순위"]) == ["3순위"] * 4

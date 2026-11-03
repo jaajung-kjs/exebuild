@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QColor
 
-from app.core.settings import Rule, Filter
+from app.core.settings import Rule, Filter, Condition
 from app.core.high_risk import HIGH_RISK_COL
 from app.ui.widgets import NoScrollComboBox
 
@@ -38,7 +38,7 @@ class ConfigureView(QWidget):
         super().__init__()
         self.state = state
         self.main = main
-        self.rule_rows = []      # [{frame, col, kw, match, prio, color}]
+        self.rule_rows = []      # [{frame, col, kw, match, prio, color, extras:[{frame,col,kw,match}]}]
         self.filter_rows = []    # [{frame, col, op, val}]
         self.include_checks = [] # 컬럼 포함 체크박스 리스트
 
@@ -126,7 +126,8 @@ class ConfigureView(QWidget):
     def _rules_card(self):
         card, lay = self._card(
             "② 중요한 행을 색으로 강조하기",
-            "예: ‘공사명’에 ‘활선’이 포함되면 1순위로 노란색 표시")
+            "예: ‘공사명’에 ‘활선’이 포함되면 1순위로 노란색 표시. "
+            "조건을 함께 따지려면 ‘＋ 그리고’를 누르세요(예: ‘대분류’에 ‘배전’ 그리고 ‘작업내용’에 ‘활선’).")
         self.rules_box = QVBoxLayout()
         self.rules_box.setSpacing(8)
         lay.addLayout(self.rules_box)
@@ -214,25 +215,37 @@ class ConfigureView(QWidget):
         return b
 
     # ---------- 강조 규칙 행 ----------
-    def _add_rule_row(self, rule: Rule = None):
-        frame = QFrame(objectName="SentenceRow")
-        h = QHBoxLayout(frame)
-        h.setContentsMargins(12, 8, 10, 8)
-        h.setSpacing(8)
+    def _cond_widgets(self, cond=None):
+        """조건 한 줄의 위젯: [열]에 [단어]이(가) [포함하면/정확히 같으면]"""
         col = self._col_combo()
         kw = QLineEdit(); kw.setPlaceholderText("찾을 단어"); kw.setMinimumHeight(32)
+        kw.setMinimumWidth(120)
         match = self._mapped_combo(MATCH_OPTS, 120)
+        if cond:
+            self._set_text(col, cond.column)
+            kw.setText(cond.keyword)
+            self._set_data(match, cond.match)
+        return col, kw, match
+
+    def _add_rule_row(self, rule: Rule = None):
+        frame = QFrame(objectName="SentenceRow")
+        outer = QVBoxLayout(frame)
+        outer.setContentsMargins(12, 8, 10, 8)
+        outer.setSpacing(6)
+        h = QHBoxLayout()
+        h.setSpacing(8)
+        col, kw, match = self._cond_widgets(rule)
         prio = self._mapped_combo(PRIORITY_OPTS, 84)
         color_btn = QPushButton("색"); color_btn.setFixedWidth(52); color_btn.setMinimumHeight(32)
         color_btn.setProperty("hex", "#FFE14D")
         color_btn.setStyleSheet(_SWATCH_QSS.format(c="#FFE14D"))
         color_btn.clicked.connect(lambda _, bt=color_btn: self._pick_color(bt))
+        and_btn = QPushButton("＋ 그리고", objectName="Ghost")
+        and_btn.setMinimumHeight(32)
+        and_btn.setToolTip("이 규칙에 조건을 더 붙입니다(선택). 모든 조건을 만족해야 강조됩니다.")
         rm = self._del_btn()
 
         if rule:
-            self._set_text(col, rule.column)
-            kw.setText(rule.keyword)
-            self._set_data(match, rule.match)
             self._set_data(prio, rule.priority)
             color_btn.setProperty("hex", rule.color)
             color_btn.setStyleSheet(_SWATCH_QSS.format(c=rule.color))
@@ -246,13 +259,43 @@ class ConfigureView(QWidget):
         h.addWidget(prio)
         h.addWidget(self._conn("· 행 색"))
         h.addWidget(color_btn)
+        h.addWidget(and_btn)
         h.addWidget(rm)
+        outer.addLayout(h)
+        extras_box = QVBoxLayout()
+        extras_box.setSpacing(6)
+        outer.addLayout(extras_box)
 
         entry = {"frame": frame, "col": col, "kw": kw, "match": match,
-                 "prio": prio, "color": color_btn}
+                 "prio": prio, "color": color_btn, "extras": [], "extras_box": extras_box}
+        and_btn.clicked.connect(lambda: self._add_extra_cond(entry))
         rm.clicked.connect(lambda: self._remove_row(entry, self.rule_rows))
+        if rule:
+            for cond in rule.extra_conditions:
+                self._add_extra_cond(entry, cond)
         self.rule_rows.append(entry)
         self.rules_box.addWidget(frame)
+
+    def _add_extra_cond(self, entry, cond: Condition = None):
+        """규칙에 '그리고' 조건 한 줄 추가."""
+        frame = QFrame(objectName="AndRow")
+        frame.setStyleSheet("QFrame#AndRow { background: transparent; }")
+        h = QHBoxLayout(frame)
+        h.setContentsMargins(0, 0, 0, 0)
+        h.setSpacing(8)
+        col, kw, match = self._cond_widgets(cond)
+        rm = self._del_btn()
+        h.addWidget(self._conn("그리고"))
+        h.addWidget(col)
+        h.addWidget(self._conn("에"))
+        h.addWidget(kw, 1)
+        h.addWidget(self._conn("이(가)"))
+        h.addWidget(match)
+        h.addWidget(rm)
+        sub = {"frame": frame, "col": col, "kw": kw, "match": match}
+        rm.clicked.connect(lambda: self._remove_row(sub, entry["extras"]))
+        entry["extras"].append(sub)
+        entry["extras_box"].addWidget(frame)
 
     # ---------- 필터 행 ----------
     def _add_filter_row(self, flt: Filter = None):
@@ -382,7 +425,11 @@ class ConfigureView(QWidget):
         preset.rules = [
             Rule(column=e["col"].currentText(), keyword=e["kw"].text(),
                  match=e["match"].currentData(), priority=e["prio"].currentData(),
-                 color=e["color"].property("hex"))
+                 color=e["color"].property("hex"),
+                 extra_conditions=[
+                     Condition(column=x["col"].currentText(), keyword=x["kw"].text(),
+                               match=x["match"].currentData())
+                     for x in e["extras"]])
             for e in self.rule_rows
         ]
         preset.filters = [
